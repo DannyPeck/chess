@@ -1,5 +1,4 @@
 use crate::Side;
-use crate::board::position::Position;
 
 #[derive(Clone)]
 pub enum PieceType {
