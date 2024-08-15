@@ -24,3 +24,22 @@ impl Piece {
     }
   }
 }
+
+impl std::fmt::Display for Piece {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let mut notation = match self.piece_type {
+      PieceType::Pawn => String::from("P"),
+      PieceType::Rook => String::from("R"),
+      PieceType::Knight => String::from("N"),
+      PieceType::Bishop => String::from("B"),
+      PieceType::King => String::from("K"),
+      PieceType::Queen => String::from("Q"),
+    };
+
+    if self.side == Side::Black {
+      notation = notation.to_ascii_lowercase();
+    }
+
+    write!(f, "{notation}")
+  }
+}

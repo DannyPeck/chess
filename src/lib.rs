@@ -98,7 +98,6 @@ impl Game {
     match &start_position.get_piece() {
       Some(piece) => {
         let legal_moves = self.get_moves(piece, start);
-        println!("legal moves: {legal_moves:?}");
         legal_moves.contains(end)
       },
       None => false

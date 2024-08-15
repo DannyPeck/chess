@@ -50,31 +50,6 @@ pub struct Board {
   pub positions: [BoardPosition; BOARD_SIZE]
 }
 
-fn side_to_notation(side: &Side) -> String {
-  match side {
-    Side::White => String::from("w"),
-    Side::Black => String::from("b")
-  }
-}
-
-fn piece_type_to_notation(piece_type: &PieceType) -> String {
-  match piece_type {
-    PieceType::Pawn => String::from("P"),
-    PieceType::Rook => String::from("R"),
-    PieceType::Knight => String::from("N"),
-    PieceType::Bishop => String::from("B"),
-    PieceType::King => String::from("K"),
-    PieceType::Queen => String::from("Q"),
-  }
-}
-
-fn piece_to_notation(piece: &Piece) -> String {
-  let side_notation = side_to_notation(&piece.side);
-  let piece_type_notation = piece_type_to_notation(&piece.piece_type);
-
-  format!("{}{}", side_notation, piece_type_notation)
-}
-
 impl Board {
   pub fn new() -> Board {
     let positions: [BoardPosition; BOARD_SIZE] = [EMPTY; BOARD_SIZE];
@@ -107,22 +82,31 @@ impl Board {
       None => false
     }
   }
+}
 
-  pub fn print_board(&self) {
+impl std::fmt::Display for Board {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let mut board_string = String::new();
     for rank in (rank::ONE..=rank::EIGHT).rev() {
       let mut rank_string = String::new();
       for file in file::A..=file::H {
         let position = Position::from_file_and_rank(file, rank).unwrap();
         let piece_notation = match &self.positions[position.value()].get_piece() {
-          Some(piece) => piece_to_notation(piece),
-          None => String::from("  ")
+          Some(piece) => piece.to_string(),
+          None => String::from(" ")
         };
 
         let position_string = format!("[{piece_notation}]");
         rank_string.push_str(&position_string);
       }
 
-      println!("{rank_string}");
+      board_string.push_str(&rank_string);
+
+      if rank != rank::ONE {
+        board_string.push_str("\n");
+      }
     }
+
+    write!(f, "{board_string}")
   }
 }

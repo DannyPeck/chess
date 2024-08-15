@@ -20,10 +20,10 @@ fn moves_to_string(moves: &Vec<Position>) -> String {
 fn main() {
     let mut game = Game::new();
 
-    game.board.print_board();
+    println!("{}", game.board);
 
     game.move_piece(&Position::b2(), &Position::b3());
     game.move_piece(&Position::e7(), &Position::e6());
 
-    game.board.print_board();
+    println!("{}", game.board);
 }
