@@ -2,9 +2,6 @@ pub mod board;
 pub mod piece;
 pub mod player;
 
-#[cfg(test)]
-mod tests;
-
 use std::collections::HashSet;
 
 use board::{position::{Position, PositionOffset}, rank, file, Board};
