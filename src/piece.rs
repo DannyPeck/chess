@@ -8,7 +8,7 @@ pub enum PieceType {
     King,
 }
 
-#[derive(Eq, PartialEq, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub enum Side {
     White = 0,
     Black = 1,

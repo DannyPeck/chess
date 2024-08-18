@@ -13,6 +13,12 @@ pub struct BoardPosition {
     opt_piece: Option<Piece>,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
+pub enum PositionState {
+    Piece(Side),
+    Empty
+  }
+
 impl BoardPosition {
     pub fn new(opt_piece: Option<Piece>) -> BoardPosition {
         BoardPosition { opt_piece }
@@ -26,6 +32,13 @@ impl BoardPosition {
 
     pub fn empty() -> BoardPosition {
         EMPTY
+    }
+
+    pub fn state(&self) -> PositionState {
+        match &self.opt_piece {
+            Some(piece) => PositionState::Piece(piece.side.clone()),
+            None => PositionState::Empty
+        }
     }
 
     pub fn get_piece(&self) -> &Option<Piece> {
@@ -46,7 +59,7 @@ impl BoardPosition {
 }
 
 pub struct Board {
-    pub positions: [BoardPosition; BOARD_SIZE],
+    positions: [BoardPosition; BOARD_SIZE],
 }
 
 impl Board {
@@ -104,6 +117,10 @@ impl Board {
         Board::from(pieces)
     }
 
+    pub fn get_position_state(&self, position: &Position) -> PositionState {
+        self.positions[position.value()].state()
+    }
+
     pub fn add_piece(&mut self, piece: Piece, position: Position) {
         self.positions[position.value()] = BoardPosition::from(piece);
     }
@@ -111,6 +128,16 @@ impl Board {
     pub fn add_pieces(&mut self, pieces: Vec<(Piece, Position)>) {
         for (piece, position) in pieces {
             self.add_piece(piece, position);
+        }
+    }
+
+    pub fn move_piece(&mut self, start: &Position, end: &Position) {
+        if utils::valid_move(&self, start, end) {
+            let start_position = &mut self.positions[start.value()];
+            let opt_moving_piece = start_position.take_piece();
+    
+            let end_position = &mut self.positions[end.value()];
+            end_position.set(opt_moving_piece);
         }
     }
 }
