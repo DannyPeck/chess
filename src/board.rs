@@ -1,9 +1,9 @@
 pub mod position;
 pub mod rank;
 pub mod file;
+pub mod utils;
 
-use crate::Side;
-use crate::piece::Piece;
+use crate::piece::{Piece, PieceType, Side};
 use position::Position;
 
 const BOARD_SIZE: usize = 64;
@@ -48,9 +48,58 @@ pub struct Board {
 }
 
 impl Board {
-  pub fn new() -> Board {
+  pub fn empty() -> Board {
     let positions: [BoardPosition; BOARD_SIZE] = [EMPTY; BOARD_SIZE];
     Board { positions }
+  }
+
+  pub fn from(pieces: Vec<(Piece, Position)>) -> Board {
+    let mut board = Board::empty();
+    board.add_pieces(pieces);
+
+    board
+  }
+
+  pub fn default() -> Board {
+    let mut pieces = Vec::new();
+
+    // White piece
+    pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::a2()));
+    pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::b2()));
+    pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::c2()));
+    pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::d2()));
+    pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::e2()));
+    pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::f2()));
+    pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::g2()));
+    pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::h2()));
+    pieces.push((Piece::new(PieceType::Rook, Side::White), Position::a1()));
+    pieces.push((Piece::new(PieceType::Rook, Side::White), Position::h1()));
+    pieces.push((Piece::new(PieceType::Knight, Side::White), Position::b1()));
+    pieces.push((Piece::new(PieceType::Knight, Side::White), Position::g1()));
+    pieces.push((Piece::new(PieceType::Bishop, Side::White), Position::c1()));
+    pieces.push((Piece::new(PieceType::Bishop, Side::White), Position::f1()));
+    pieces.push((Piece::new(PieceType::King, Side::White), Position::e1()));
+    pieces.push((Piece::new(PieceType::Queen, Side::White), Position::d1()));
+
+    // Black pieces
+    pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::a7()));
+    pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::b7()));
+    pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::c7()));
+    pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::d7()));
+    pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::e7()));
+    pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::f7()));
+    pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::g7()));
+    pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::h7()));
+    pieces.push((Piece::new(PieceType::Rook, Side::Black), Position::a8()));
+    pieces.push((Piece::new(PieceType::Rook, Side::Black), Position::h8()));
+    pieces.push((Piece::new(PieceType::Knight, Side::Black), Position::b8()));
+    pieces.push((Piece::new(PieceType::Knight, Side::Black), Position::g8()));
+    pieces.push((Piece::new(PieceType::Bishop, Side::Black), Position::c8()));
+    pieces.push((Piece::new(PieceType::Bishop, Side::Black), Position::f8()));
+    pieces.push((Piece::new(PieceType::King, Side::Black), Position::d8()));
+    pieces.push((Piece::new(PieceType::Queen, Side::Black), Position::e8()));
+
+    Board::from(pieces)
   }
 
   pub fn add_piece(&mut self, piece: Piece, position: Position) {
@@ -60,19 +109,6 @@ impl Board {
   pub fn add_pieces(&mut self, pieces: Vec<(Piece, Position)>) {
     for (piece, position) in pieces {
       self.add_piece(piece, position);
-    }
-  }
-
-  pub fn contains_piece(&self, position: &Position) -> bool {
-    let board_position = &self.positions[position.value()];
-    board_position.get_piece().is_some()
-  }
-
-  pub fn contains_enemy_piece(&self, position: &Position, side: &Side) -> bool {
-    let board_position = &self.positions[position.value()];
-    match &board_position.get_piece() {
-      Some(piece) => &piece.side != side,
-      None => false
     }
   }
 }

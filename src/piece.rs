@@ -1,5 +1,3 @@
-use crate::Side;
-
 #[derive(Clone)]
 pub enum PieceType {
   Pawn,
@@ -8,6 +6,12 @@ pub enum PieceType {
   Rook,
   Queen,
   King
+}
+
+#[derive(Eq, PartialEq, Clone)]
+pub enum Side {
+  White = 0,
+  Black = 1
 }
 
 #[derive(Clone)]
