@@ -66,10 +66,6 @@ impl Board {
     }
   }
 
-  pub fn set_position(&mut self, position: &Position, piece: &Option<Piece>) {
-    self.positions[position.value()] = BoardPosition::new(piece);
-  }
-
   pub fn contains_piece(&self, position: &Position) -> bool {
     let board_position = &self.positions[position.value()];
     board_position.get_piece().is_some()

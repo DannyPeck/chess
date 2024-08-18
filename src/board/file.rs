@@ -8,3 +8,17 @@ pub const G: usize = 6;
 pub const H: usize = 7;
 
 pub const LENGTH: usize = 8;
+
+pub fn to_char(file: usize) -> char {
+  match file {
+    A => 'a',
+    B => 'b',
+    C => 'c',
+    D => 'd',
+    E => 'e',
+    F => 'f',
+    G => 'g',
+    H => 'h',
+    _ => '?'
+  }
+}

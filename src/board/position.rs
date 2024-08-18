@@ -83,16 +83,24 @@ impl Position {
   pub fn from_file_and_rank(file: usize, rank: usize) -> Option<Position> {
     if file <= file::H && rank <= rank::EIGHT {
       let position = (rank * 8) + file;
-      let position = position as usize;
       Some(Position { position })
     } else {
       None
     }
   }
 
-  pub fn from_move(start: &Position, piece_move: Move) -> Option<Position> {
-    let new_file = start.file() as i32 + piece_move.file_offset;
-    let new_rank = start.rank() as i32 + piece_move.rank_offset;
+  pub fn from_valid_file_and_rank(file: usize, rank: usize) -> Position {
+    if file > file::H || rank > rank::EIGHT {
+      panic!("Passed an invalid file or rank value into from_valid_file_and_rank().");
+    }
+
+    let position = (rank * 8) + file;
+    Position { position }
+  }
+
+  pub fn from_offset(start: &Position, offset: PositionOffset) -> Option<Position> {
+    let new_file = start.file() as i32 + offset.file_offset;
+    let new_rank = start.rank() as i32 + offset.rank_offset;
 
     if new_file < 0 || new_rank < 0 {
       return None;
@@ -114,48 +122,20 @@ impl Position {
   }
 }
 
-pub fn file_to_char(file: usize) -> char {
-  match file {
-    file::A => 'a',
-    file::B => 'b',
-    file::C => 'c',
-    file::D => 'd',
-    file::E => 'e',
-    file::F => 'f',
-    file::G => 'g',
-    file::H => 'h',
-    _ => '?'
-  }
-}
-
-pub fn rank_to_char(rank: usize) -> char {
-  match rank {
-    rank::ONE => '1',
-    rank::TWO => '2',
-    rank::THREE => '3',
-    rank::FOUR => '4',
-    rank::FIVE => '5',
-    rank::SIX => '6',
-    rank::SEVEN => '7',
-    rank::EIGHT => '8',
-    _ => '?'
-  }
-}
-
 impl std::fmt::Display for Position {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}{}", file_to_char(self.file()), rank_to_char(self.rank()))
+    write!(f, "{}{}", file::to_char(self.file()), rank::to_char(self.rank()))
   }
 }
 
-pub struct Move {
+pub struct PositionOffset {
   pub file_offset: i32,
   pub rank_offset: i32
 }
 
-impl Move {
-  pub fn new(file_offset: i32, rank_offset: i32) -> Move {
-    Move {
+impl PositionOffset {
+  pub fn new(file_offset: i32, rank_offset: i32) -> PositionOffset {
+    PositionOffset {
       file_offset,
       rank_offset
     }

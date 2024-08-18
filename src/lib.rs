@@ -2,9 +2,12 @@ pub mod board;
 pub mod piece;
 pub mod player;
 
+#[cfg(test)]
+mod tests;
+
 use std::collections::HashSet;
 
-use board::{Board, position::{Position, Move}};
+use board::{position::{Position, PositionOffset}, rank, file, Board};
 use piece::{Piece, PieceType};
 
 #[derive(Eq, PartialEq, Clone)]
@@ -37,7 +40,7 @@ impl Game {
   pub fn get_moves(&self, piece: &Piece, position: &Position) -> HashSet<Position> {
     let legal_board_positions = match piece.piece_type {
       PieceType::Pawn => self.get_pawn_moves(&piece.side, position),
-      PieceType::Rook => self.get_pawn_moves(&piece.side, position),
+      PieceType::Rook => self.get_rook_moves(&piece.side, position),
       PieceType::Knight => self.get_pawn_moves(&piece.side, position),
       PieceType::Bishop => self.get_pawn_moves(&piece.side, position),
       PieceType::King => self.get_pawn_moves(&piece.side, position),
@@ -47,30 +50,30 @@ impl Game {
     legal_board_positions
   }
 
-  pub fn get_pawn_moves(&self, side: &Side, position: &Position) -> HashSet<Position> {
+  fn get_pawn_moves(&self, side: &Side, position: &Position) -> HashSet<Position> {
     let mut legal_positions = HashSet::new();
 
-    let front_move = if *side == Side::White {
-      Move::new(0, 1)
+    let front_offset = if *side == Side::White {
+      PositionOffset::new(0, 1)
     } else {
-      Move::new(0, -1)
+      PositionOffset::new(0, -1)
     };
 
-    let left_diagonal_move = if *side == Side::White {
-      Move::new(-1, 1)
+    let left_diagonal_offset = if *side == Side::White {
+      PositionOffset::new(-1, 1)
     } else {
-      Move::new(1, -1)
+      PositionOffset::new(1, -1)
     };
 
-    let right_diagonal_move = if *side == Side::White {
-      Move::new(1, 1)
+    let right_diagonal_offset = if *side == Side::White {
+      PositionOffset::new(1, 1)
     } else {
-      Move::new(-1, -1)
+      PositionOffset::new(-1, -1)
     };
 
-    let opt_front = Position::from_move(&position, front_move);
-    let opt_left_diagonal = Position::from_move(&position, left_diagonal_move);
-    let opt_right_diagonal = Position::from_move(&position, right_diagonal_move);
+    let opt_front = Position::from_offset(&position, front_offset);
+    let opt_left_diagonal = Position::from_offset(&position, left_diagonal_offset);
+    let opt_right_diagonal = Position::from_offset(&position, right_diagonal_offset);
 
     if let Some(front) = opt_front {
       if !self.board.contains_piece(&front) {
@@ -93,7 +96,70 @@ impl Game {
     return legal_positions;
   }
 
-  pub fn valid_move(&self, start: &Position, end: &Position) -> bool {
+  // Legal move
+  // occupiable square
+
+  fn is_occupiable_position(&self, side: &Side, position: &Position) -> bool {
+    match self.board.positions[position.value()].get_piece() {
+      Some(piece) => {
+        side != &piece.side
+      },
+      None => true
+    }
+  }
+
+  fn get_linear_moves(&self, side: &Side, position: &Position) -> HashSet<Position> {
+    let mut legal_positions = HashSet::new();
+
+    let current_rank = position.rank();
+    let current_file = position.file();
+
+    for i in current_rank..rank::EIGHT {
+      let next_rank = i + 1;
+      let next_position = Position::from_valid_file_and_rank(current_file, next_rank);
+      if self.is_occupiable_position(side, &next_position) {
+        legal_positions.insert(next_position);
+      } else {
+        break;
+      }
+    }
+
+    for previous_rank in (rank::ONE..current_rank).rev() {
+      let next_position = Position::from_valid_file_and_rank(current_file, previous_rank);
+      if self.is_occupiable_position(side, &next_position) {
+        legal_positions.insert(next_position);
+      } else {
+        break;
+      }
+    }
+
+    for i in current_file..file::H {
+      let next_file = i + 1;
+      let next_position = Position::from_valid_file_and_rank(next_file, current_rank);
+      if self.is_occupiable_position(side, &next_position) {
+        legal_positions.insert(next_position);
+      } else {
+        break;
+      }
+    }
+
+    for previous_file in (file::A..current_file).rev() {
+      let next_position = Position::from_valid_file_and_rank(previous_file, current_rank);
+      if self.is_occupiable_position(side, &next_position) {
+        legal_positions.insert(next_position);
+      } else {
+        break;
+      }
+    }
+
+    legal_positions
+  }
+
+  fn get_rook_moves(&self, side: &Side, position: &Position) -> HashSet<Position> {
+    self.get_linear_moves(side, position)
+  }
+
+  fn valid_move(&self, start: &Position, end: &Position) -> bool {
     let start_position = &self.board.positions[start.value()];
     match &start_position.get_piece() {
       Some(piece) => {

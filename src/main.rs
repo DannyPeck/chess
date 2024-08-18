@@ -1,7 +1,11 @@
-use chess::board::position::Position;
-use chess::Game;
+use std::collections::HashSet;
 
-fn moves_to_string(moves: &Vec<Position>) -> String {
+use chess::board::position::Position;
+use chess::piece::{Piece, PieceType};
+use chess::Game;
+use chess::Side;
+
+fn moves_to_string(moves: &HashSet<Position>) -> String {
     let mut output = String::new();
 
     let mut counter = 0;
@@ -21,9 +25,8 @@ fn main() {
     let mut game = Game::new();
 
     println!("{}", game.board);
-
-    game.move_piece(&Position::b2(), &Position::b3());
-    game.move_piece(&Position::e7(), &Position::e6());
+  
+    game.board.add_piece(&Piece::new(PieceType::Rook, Side::White), &Position::e4());
 
     println!("{}", game.board);
 }
