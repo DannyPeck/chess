@@ -72,26 +72,9 @@ pub struct Position {
 }
 
 impl Position {
-  pub fn from(position: usize) -> Option<Position> {
-    if position <= H8 {
-      Some(Position { position } )
-    } else {
-      None
-    }
-  }
-
-  pub fn from_file_and_rank(file: usize, rank: usize) -> Option<Position> {
-    if file <= file::H && rank <= rank::EIGHT {
-      let position = (rank * 8) + file;
-      Some(Position { position })
-    } else {
-      None
-    }
-  }
-
-  pub fn from_valid_file_and_rank(file: usize, rank: usize) -> Position {
+  pub fn from_file_and_rank(file: usize, rank: usize) -> Position {
     if file > file::H || rank > rank::EIGHT {
-      panic!("Passed an invalid file or rank value into from_valid_file_and_rank().");
+      panic!("Passed an invalid file or rank value into from_file_and_rank().");
     }
 
     let position = (rank * 8) + file;
@@ -102,11 +85,11 @@ impl Position {
     let new_file = start.file() as i32 + offset.file_offset;
     let new_rank = start.rank() as i32 + offset.rank_offset;
 
-    if new_file < 0 || new_rank < 0 {
+    if new_file < 0 || new_file > 7 || new_rank < 0 || new_rank > 7 {
       return None;
     }
 
-    Position::from_file_and_rank(new_file as usize, new_rank as usize)
+    Some(Position::from_file_and_rank(new_file as usize, new_rank as usize))
   }
 
   pub fn value(&self) -> usize {
@@ -213,62 +196,25 @@ impl Position {
 mod tests {
   use super::*;
 
-    #[test]
-  fn from() {
-    assert!(Position::from(0).is_some());
-    assert!(Position::from(1).is_some());
-    assert!(Position::from(63).is_some());
-    assert!(Position::from(64).is_none());
-  }
-
   #[test]
-  fn from_file_and_rank() {
-    assert!(Position::from_file_and_rank(0, 0).is_some());
-    assert!(Position::from_file_and_rank(0, 7).is_some());
-    assert!(Position::from_file_and_rank(7, 0).is_some());
-    assert!(Position::from_file_and_rank(7, 7).is_some());
-
-    assert!(Position::from_file_and_rank(0, 8).is_none());
-    assert!(Position::from_file_and_rank(8, 0).is_none());
+  fn from_file_and_rank_valid() -> Result<(), String> {
+    Position::from_file_and_rank(0, 0);
+    Position::from_file_and_rank(0, 7);
+    Position::from_file_and_rank(7, 0);
+    Position::from_file_and_rank(7, 7);
 
     {
       let position = Position::from_file_and_rank(file::A, rank::ONE);
-      assert!(position.is_some());
-      assert_eq!(position.unwrap().value(), 0);
-    }
-
-    {
-      let position = Position::from_file_and_rank(file::H, rank::EIGHT);
-      assert!(position.is_some());
-      assert_eq!(position.unwrap().value(), 63);
-    }
-
-    {
-      let position = Position::from_file_and_rank(file::C, rank::SIX);
-      assert!(position.is_some());
-      assert_eq!(position.unwrap().value(), 42);
-    }
-  }
-
-  #[test]
-  fn from_valid_file_and_rank_valid() -> Result<(), String> {
-    Position::from_valid_file_and_rank(0, 0);
-    Position::from_valid_file_and_rank(0, 7);
-    Position::from_valid_file_and_rank(7, 0);
-    Position::from_valid_file_and_rank(7, 7);
-
-    {
-      let position = Position::from_valid_file_and_rank(file::A, rank::ONE);
       assert_eq!(position.value(), 0);
     }
 
     {
-      let position = Position::from_valid_file_and_rank(file::H, rank::EIGHT);
+      let position = Position::from_file_and_rank(file::H, rank::EIGHT);
       assert_eq!(position.value(), 63);
     }
 
     {
-      let position = Position::from_valid_file_and_rank(file::C, rank::SIX);
+      let position = Position::from_file_and_rank(file::C, rank::SIX);
       assert_eq!(position.value(), 42);
     }
 
@@ -277,14 +223,14 @@ mod tests {
 
   #[test]
   #[should_panic]
-  fn from_valid_file_and_rank_invalid_file() {
-    Position::from_valid_file_and_rank(8, 0);
+  fn from_file_and_rank_invalid_file() {
+    Position::from_file_and_rank(8, 0);
   }
 
   #[test]
   #[should_panic]
-  fn from_valid_file_and_rank_invalid_rank() {
-    Position::from_valid_file_and_rank(0, 8);
+  fn from_file_and_rank_invalid_rank() {
+    Position::from_file_and_rank(0, 8);
   }
 
   #[test]

@@ -3,7 +3,7 @@ pub mod rank;
 pub mod file;
 
 use crate::Side;
-use crate::piece::{Piece, PieceType};
+use crate::piece::Piece;
 use position::Position;
 
 const BOARD_SIZE: usize = 64;
@@ -14,15 +14,12 @@ pub struct BoardPosition {
 }
 
 impl BoardPosition {
-  pub fn new(opt_piece: &Option<Piece>) -> BoardPosition {
-    match opt_piece {
-      Some(piece) => BoardPosition::from(piece),
-      None => BoardPosition::empty()
-    }
+  pub fn new(opt_piece: Option<Piece>) -> BoardPosition {
+    BoardPosition { opt_piece }
   }
 
-  pub fn from(piece: &Piece) -> BoardPosition {
-    BoardPosition { opt_piece: Some(piece.clone()) }
+  pub fn from(piece: Piece) -> BoardPosition {
+    BoardPosition { opt_piece: Some(piece) }
   }
 
   pub fn empty() -> BoardPosition {
@@ -56,11 +53,11 @@ impl Board {
     Board { positions }
   }
 
-  pub fn add_piece(&mut self, piece: &Piece, position: &Position) {
+  pub fn add_piece(&mut self, piece: Piece, position: Position) {
     self.positions[position.value()] = BoardPosition::from(piece);
   }
 
-  pub fn add_pieces(&mut self, pieces: &Vec<(Piece, Position)>) {
+  pub fn add_pieces(&mut self, pieces: Vec<(Piece, Position)>) {
     for (piece, position) in pieces {
       self.add_piece(piece, position);
     }
@@ -86,8 +83,8 @@ impl std::fmt::Display for Board {
     for rank in (rank::ONE..=rank::EIGHT).rev() {
       let mut rank_string = String::new();
       for file in file::A..=file::H {
-        let position = Position::from_file_and_rank(file, rank).unwrap();
-        let piece_notation = match &self.positions[position.value()].get_piece() {
+        let position = Position::from_file_and_rank(file, rank);
+        let piece_notation = match self.positions[position.value()].get_piece() {
           Some(piece) => piece.to_string(),
           None => String::from(" ")
         };

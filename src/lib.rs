@@ -21,12 +21,9 @@ pub struct Game {
 impl Game {
   pub fn new() -> Game {
     let mut board = Board::new();
-
-    let white_pieces = player::white_pieces();
-    let black_pieces = player::black_pieces();
-
-    board.add_pieces(&white_pieces);
-    board.add_pieces(&black_pieces);
+    
+    board.add_pieces(player::white_pieces());
+    board.add_pieces(player::black_pieces());
 
     Game {
       board,
@@ -93,9 +90,6 @@ impl Game {
     return legal_positions;
   }
 
-  // Legal move
-  // occupiable square
-
   fn is_occupiable_position(&self, side: &Side, position: &Position) -> bool {
     match self.board.positions[position.value()].get_piece() {
       Some(piece) => {
@@ -113,40 +107,44 @@ impl Game {
 
     for i in current_rank..rank::EIGHT {
       let next_rank = i + 1;
-      let next_position = Position::from_valid_file_and_rank(current_file, next_rank);
-      if self.is_occupiable_position(side, &next_position) {
-        legal_positions.insert(next_position);
-      } else {
+      let next_position = Position::from_file_and_rank(current_file, next_rank);
+      
+      if !self.is_occupiable_position(side, &next_position) {
         break;
       }
+
+      legal_positions.insert(next_position);
     }
 
     for previous_rank in (rank::ONE..current_rank).rev() {
-      let next_position = Position::from_valid_file_and_rank(current_file, previous_rank);
-      if self.is_occupiable_position(side, &next_position) {
-        legal_positions.insert(next_position);
-      } else {
+      let next_position = Position::from_file_and_rank(current_file, previous_rank);
+      
+      if !self.is_occupiable_position(side, &next_position) {
         break;
       }
+
+      legal_positions.insert(next_position);
     }
 
     for i in current_file..file::H {
       let next_file = i + 1;
-      let next_position = Position::from_valid_file_and_rank(next_file, current_rank);
-      if self.is_occupiable_position(side, &next_position) {
-        legal_positions.insert(next_position);
-      } else {
+      let next_position = Position::from_file_and_rank(next_file, current_rank);
+
+      if !self.is_occupiable_position(side, &next_position) {
         break;
       }
+
+      legal_positions.insert(next_position);
     }
 
     for previous_file in (file::A..current_file).rev() {
-      let next_position = Position::from_valid_file_and_rank(previous_file, current_rank);
-      if self.is_occupiable_position(side, &next_position) {
-        legal_positions.insert(next_position);
-      } else {
+      let next_position = Position::from_file_and_rank(previous_file, current_rank);
+      
+      if !self.is_occupiable_position(side, &next_position) {
         break;
       }
+
+      legal_positions.insert(next_position);
     }
 
     legal_positions
@@ -175,5 +173,21 @@ impl Game {
       let end_position = &mut self.board.positions[end.value()];
       end_position.set(opt_moving_piece);
     }
+  }
+
+  fn moves_to_string(moves: &HashSet<Position>) -> String {
+    let mut output = String::new();
+  
+    let mut counter = 0;
+    for current_move in moves {
+      if counter > 0 {
+        output += ", ";
+      }
+      output += format!("{current_move}").as_str();
+  
+      counter = counter + 1;
+    }
+  
+    output
   }
 }
