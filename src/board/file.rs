@@ -26,3 +26,17 @@ pub fn to_char(file: usize) -> char {
         _ => '?',
     }
 }
+
+pub fn from_char(file: char) -> Option<usize> {
+    match file {
+        'a' => Some(A),
+        'b' => Some(B),
+        'c' => Some(C),
+        'd' => Some(D),
+        'e' => Some(E),
+        'f' => Some(F),
+        'g' => Some(G),
+        'h' => Some(H),
+        _ => None,
+    }
+}

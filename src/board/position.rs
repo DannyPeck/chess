@@ -81,7 +81,7 @@ impl Position {
         Position { position }
     }
 
-    pub fn from_offset(start: &Position, offset: PositionOffset) -> Option<Position> {
+    pub fn from_offset(start: &Position, offset: &Offset) -> Option<Position> {
         let new_file = start.file() as i32 + offset.file_offset;
         let new_rank = start.rank() as i32 + offset.rank_offset;
 
@@ -93,6 +93,22 @@ impl Position {
             new_file as usize,
             new_rank as usize,
         ))
+    }
+
+    pub fn from_str(position: &str) -> Option<Position> {
+        if position.len() != 2 {
+            return None;
+        }
+
+        let position = position.to_lowercase();
+
+        let file: char = position.chars().nth(0).unwrap();
+        let rank: char = position.chars().nth(1).unwrap();
+
+        match (file::from_char(file), rank::from_char(rank)) {
+            (Some(file), Some(rank)) => Some(Position::from_file_and_rank(file, rank)),
+            _ => None,
+        }
     }
 
     pub fn value(&self) -> usize {
@@ -119,14 +135,15 @@ impl std::fmt::Display for Position {
     }
 }
 
-pub struct PositionOffset {
+#[derive(Debug)]
+pub struct Offset {
     pub file_offset: i32,
     pub rank_offset: i32,
 }
 
-impl PositionOffset {
-    pub fn new(file_offset: i32, rank_offset: i32) -> PositionOffset {
-        PositionOffset {
+impl Offset {
+    pub fn new(file_offset: i32, rank_offset: i32) -> Offset {
+        Offset {
             file_offset,
             rank_offset,
         }
@@ -373,62 +390,96 @@ mod tests {
     fn from_offset() {
         // Valid forward file move
         {
-            let new_position = Position::from_offset(&Position::a4(), PositionOffset::new(1, 0));
+            let new_position = Position::from_offset(&Position::a4(), &Offset::new(1, 0));
             assert!(new_position.is_some());
             assert_eq!(new_position.unwrap(), Position::b4());
         }
 
         // Valid backward file move
         {
-            let new_position = Position::from_offset(&Position::e4(), PositionOffset::new(-2, 0));
+            let new_position = Position::from_offset(&Position::e4(), &Offset::new(-2, 0));
             assert!(new_position.is_some());
             assert_eq!(new_position.unwrap(), Position::c4());
         }
 
         // Valid forward rank move
         {
-            let new_position = Position::from_offset(&Position::h3(), PositionOffset::new(0, 5));
+            let new_position = Position::from_offset(&Position::h3(), &Offset::new(0, 5));
             assert!(new_position.is_some());
             assert_eq!(new_position.unwrap(), Position::h8());
         }
 
         // Valid backwards rank move
         {
-            let new_position = Position::from_offset(&Position::d6(), PositionOffset::new(0, -1));
+            let new_position = Position::from_offset(&Position::d6(), &Offset::new(0, -1));
             assert!(new_position.is_some());
             assert_eq!(new_position.unwrap(), Position::d5());
         }
 
         // Valid no-op move
         {
-            let new_position = Position::from_offset(&Position::d6(), PositionOffset::new(0, 0));
+            let new_position = Position::from_offset(&Position::d6(), &Offset::new(0, 0));
             assert!(new_position.is_some());
             assert_eq!(new_position.unwrap(), Position::d6());
         }
 
         // Invalid forward file move
         {
-            let new_position = Position::from_offset(&Position::h4(), PositionOffset::new(1, 0));
+            let new_position = Position::from_offset(&Position::h4(), &Offset::new(1, 0));
             assert!(new_position.is_none());
         }
 
         // Invalid backward file move
         {
-            let new_position = Position::from_offset(&Position::a4(), PositionOffset::new(-1, 0));
+            let new_position = Position::from_offset(&Position::a4(), &Offset::new(-1, 0));
             assert!(new_position.is_none());
         }
 
         // Invalid forward rank move
         {
-            let new_position = Position::from_offset(&Position::d8(), PositionOffset::new(0, 1));
+            let new_position = Position::from_offset(&Position::d8(), &Offset::new(0, 1));
             assert!(new_position.is_none());
         }
 
         // Invalid backward rank move
         {
-            let new_position = Position::from_offset(&Position::d2(), PositionOffset::new(0, -3));
+            let new_position = Position::from_offset(&Position::d2(), &Offset::new(0, -3));
             assert!(new_position.is_none());
         }
+    }
+
+    #[test]
+    fn from_str() {
+        // Valid positions
+        assert_eq!(Position::from_str("a1").unwrap(), Position::a1());
+        assert_eq!(Position::from_str("b2").unwrap(), Position::b2());
+        assert_eq!(Position::from_str("c3").unwrap(), Position::c3());
+        assert_eq!(Position::from_str("d4").unwrap(), Position::d4());
+        assert_eq!(Position::from_str("e5").unwrap(), Position::e5());
+        assert_eq!(Position::from_str("f6").unwrap(), Position::f6());
+        assert_eq!(Position::from_str("g7").unwrap(), Position::g7());
+        assert_eq!(Position::from_str("h8").unwrap(), Position::h8());
+
+        // Valid case insensitive
+        assert_eq!(Position::from_str("A8").unwrap(), Position::a8());
+        assert_eq!(Position::from_str("B7").unwrap(), Position::b7());
+        assert_eq!(Position::from_str("C6").unwrap(), Position::c6());
+        assert_eq!(Position::from_str("D5").unwrap(), Position::d5());
+        assert_eq!(Position::from_str("E4").unwrap(), Position::e4());
+        assert_eq!(Position::from_str("F3").unwrap(), Position::f3());
+        assert_eq!(Position::from_str("G2").unwrap(), Position::g2());
+        assert_eq!(Position::from_str("H1").unwrap(), Position::h1());
+
+        // Invalid positions
+        assert_eq!(Position::from_str("a10"), None);
+        assert_eq!(Position::from_str("b9"), None);
+        assert_eq!(Position::from_str("b"), None);
+        assert_eq!(Position::from_str("3"), None);
+        assert_eq!(Position::from_str("i"), None);
+        assert_eq!(Position::from_str("z"), None);
+        assert_eq!(Position::from_str("3b"), None);
+        assert_eq!(Position::from_str("h0"), None);
+        assert_eq!(Position::from_str(""), None);
     }
 
     #[test]

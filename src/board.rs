@@ -6,7 +6,7 @@ pub mod utils;
 use std::collections::HashSet;
 
 use crate::piece::{Piece, PieceType, Side};
-use position::{Position, PositionOffset};
+use position::{Offset, Position};
 
 const BOARD_SIZE: usize = 64;
 const EMPTY: BoardPosition = BoardPosition { opt_piece: None };
@@ -110,19 +110,23 @@ impl Board {
         &self.positions[position.value()]
     }
 
+    pub fn get_piece(&self, position: &Position) -> &Option<Piece> {
+        &self.get_board_position(position).opt_piece
+    }
+
     pub fn is_occupiable_position(&self, position: &Position, side: &Side) -> bool {
-        match &self.get_board_position(position).opt_piece {
+        match self.get_piece(position) {
             Some(piece) => piece.side != *side,
             None => true,
         }
     }
 
     pub fn contains_piece(&self, position: &Position) -> bool {
-        self.get_board_position(position).opt_piece.is_none()
+        self.get_piece(position).is_some()
     }
 
     pub fn contains_enemy_piece(&self, position: &Position, side: &Side) -> bool {
-        match &self.get_board_position(position).opt_piece {
+        match self.get_piece(position) {
             Some(piece) => piece.side != *side,
             None => false,
         }
@@ -138,14 +142,17 @@ impl Board {
         }
     }
 
-    pub fn move_piece(&mut self, start: &Position, end: &Position) {
-        if self.valid_move(start, end) {
+    pub fn move_piece(&mut self, start: &Position, end: &Position) -> bool {
+        let valid_move = self.valid_move(start, end);
+        if valid_move {
             let start_position = &mut self.positions[start.value()];
             let opt_moving_piece = start_position.take_piece();
 
             let end_position = &mut self.positions[end.value()];
             end_position.set(opt_moving_piece);
         }
+
+        valid_move
     }
 
     pub fn get_moves(&self, piece: &Piece, position: &Position) -> HashSet<Position> {
@@ -164,40 +171,54 @@ impl Board {
     pub fn get_pawn_moves(&self, position: &Position, side: &Side) -> HashSet<Position> {
         let mut valid_positions = HashSet::new();
 
-        let front_offset = if *side == Side::White {
-            PositionOffset::new(0, 1)
+        let forward_one_offset = if *side == Side::White {
+            Offset::new(0, 1)
         } else {
-            PositionOffset::new(0, -1)
+            Offset::new(0, -1)
+        };
+
+        let forward_two_offset = if *side == Side::White {
+            Offset::new(0, 2)
+        } else {
+            Offset::new(0, -2)
         };
 
         let left_diagonal_offset = if *side == Side::White {
-            PositionOffset::new(-1, 1)
+            Offset::new(-1, 1)
         } else {
-            PositionOffset::new(1, -1)
+            Offset::new(1, -1)
         };
 
         let right_diagonal_offset = if *side == Side::White {
-            PositionOffset::new(1, 1)
+            Offset::new(1, 1)
         } else {
-            PositionOffset::new(-1, -1)
+            Offset::new(-1, -1)
         };
 
         let forward_move = |new_position: &Position| !self.contains_piece(new_position);
         let diagonal_move =
-            |new_position: &Position| !self.contains_enemy_piece(new_position, &side);
-
-        if let Some(new_position) = utils::get_if_valid(&position, front_offset, forward_move) {
-            valid_positions.insert(new_position);
-        }
+            |new_position: &Position| self.contains_enemy_piece(new_position, &side);
 
         if let Some(new_position) =
-            utils::get_if_valid(&position, left_diagonal_offset, diagonal_move)
+            utils::get_if_valid(&position, &forward_one_offset, forward_move)
         {
             valid_positions.insert(new_position);
         }
 
         if let Some(new_position) =
-            utils::get_if_valid(&position, right_diagonal_offset, diagonal_move)
+            utils::get_if_valid(&position, &forward_two_offset, forward_move)
+        {
+            valid_positions.insert(new_position);
+        }
+
+        if let Some(new_position) =
+            utils::get_if_valid(&position, &left_diagonal_offset, diagonal_move)
+        {
+            valid_positions.insert(new_position);
+        }
+
+        if let Some(new_position) =
+            utils::get_if_valid(&position, &right_diagonal_offset, diagonal_move)
         {
             valid_positions.insert(new_position);
         }
@@ -216,21 +237,21 @@ impl Board {
 
         let offsets = vec![
             // North East
-            PositionOffset::new(1, 2),
-            PositionOffset::new(2, 1),
+            Offset::new(1, 2),
+            Offset::new(2, 1),
             // South East
-            PositionOffset::new(1, -2),
-            PositionOffset::new(2, -1),
+            Offset::new(1, -2),
+            Offset::new(2, -1),
             // North West
-            PositionOffset::new(-1, 2),
-            PositionOffset::new(-2, 1),
+            Offset::new(-1, 2),
+            Offset::new(-2, 1),
             // South West
-            PositionOffset::new(-2, -1),
-            PositionOffset::new(-1, -2)
+            Offset::new(-2, -1),
+            Offset::new(-1, -2),
         ];
 
         for offset in offsets {
-            if let Some(new_position) = utils::get_if_valid(&position, offset, filter) {
+            if let Some(new_position) = utils::get_if_valid(&position, &offset, filter) {
                 valid_positions.insert(new_position);
             }
         }
@@ -257,18 +278,18 @@ impl Board {
         let filter = |new_position: &Position| self.is_occupiable_position(&new_position, side);
 
         let offsets = vec![
-            PositionOffset::new(1, 0),
-            PositionOffset::new(0, 1),
-            PositionOffset::new(-1, 0),
-            PositionOffset::new(0, -1),
-            PositionOffset::new(1, 1),
-            PositionOffset::new(-1, 1),
-            PositionOffset::new(1, -1),
-            PositionOffset::new(-1, -1)
+            Offset::new(1, 0),
+            Offset::new(0, 1),
+            Offset::new(-1, 0),
+            Offset::new(0, -1),
+            Offset::new(1, 1),
+            Offset::new(-1, 1),
+            Offset::new(1, -1),
+            Offset::new(-1, -1),
         ];
 
         for offset in offsets {
-            if let Some(new_position) = utils::get_if_valid(&position, offset, filter) {
+            if let Some(new_position) = utils::get_if_valid(&position, &offset, filter) {
                 valid_positions.insert(new_position);
             }
         }
@@ -282,16 +303,16 @@ impl Board {
         let filter = |new_position: &Position| self.is_occupiable_position(&new_position, side);
 
         // Right & Up
-        utils::add_while_valid(position, 1, 1, filter, &mut valid_positions);
+        utils::add_while_valid(position, &Offset::new(1, 1), filter, &mut valid_positions);
 
         // Left & Up
-        utils::add_while_valid(position, -1, 1, filter, &mut valid_positions);
+        utils::add_while_valid(position, &Offset::new(-1, 1), filter, &mut valid_positions);
 
         // Right & Down
-        utils::add_while_valid(position, 1, -1, filter, &mut valid_positions);
+        utils::add_while_valid(position, &Offset::new(1, -1), filter, &mut valid_positions);
 
         // Left & Down
-        utils::add_while_valid(position, -1, -1, filter, &mut valid_positions);
+        utils::add_while_valid(position, &Offset::new(-1, -1), filter, &mut valid_positions);
 
         valid_positions
     }
@@ -302,16 +323,16 @@ impl Board {
         let filter = |new_position: &Position| self.is_occupiable_position(&new_position, side);
 
         // Up
-        utils::add_while_valid(position, 0, 1, filter, &mut valid_positions);
+        utils::add_while_valid(position, &Offset::new(0, 1), filter, &mut valid_positions);
 
         // Down
-        utils::add_while_valid(position, 0, -1, filter, &mut valid_positions);
+        utils::add_while_valid(position, &Offset::new(0, -1), filter, &mut valid_positions);
 
         // Right
-        utils::add_while_valid(position, 1, 0, filter, &mut valid_positions);
+        utils::add_while_valid(position, &Offset::new(1, 0), filter, &mut valid_positions);
 
         // Left
-        utils::add_while_valid(position, -1, 0, filter, &mut valid_positions);
+        utils::add_while_valid(position, &Offset::new(-1, 0), filter, &mut valid_positions);
 
         valid_positions
     }

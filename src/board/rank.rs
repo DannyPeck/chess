@@ -26,3 +26,17 @@ pub fn to_char(rank: usize) -> char {
         _ => '?',
     }
 }
+
+pub fn from_char(rank: char) -> Option<usize> {
+    match rank {
+        '1' => Some(ONE),
+        '2' => Some(TWO),
+        '3' => Some(THREE),
+        '4' => Some(FOUR),
+        '5' => Some(FIVE),
+        '6' => Some(SIX),
+        '7' => Some(SEVEN),
+        '8' => Some(EIGHT),
+        _ => None,
+    }
+}
