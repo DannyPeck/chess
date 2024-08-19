@@ -9,6 +9,10 @@ pub const EIGHT: usize = 7;
 
 pub const LENGTH: usize = 8;
 
+pub fn valid(rank: i32) -> bool {
+    rank >= ONE as i32 && rank <= EIGHT as i32
+}
+
 pub fn to_char(rank: usize) -> char {
     match rank {
         ONE => '1',

@@ -1,4 +1,4 @@
-use crate::board::{Board, BoardPosition};
+use crate::board::{position::Position, Board};
 
 pub struct Game {
     pub board: Board,
@@ -7,7 +7,7 @@ pub struct Game {
     pub white_long_castle_rights: bool,
     pub black_short_castle_rights: bool,
     pub black_long_castle_rights: bool,
-    pub en_passant_target: Option<BoardPosition>,
+    pub en_passant_target: Option<Position>,
 }
 
 impl Game {

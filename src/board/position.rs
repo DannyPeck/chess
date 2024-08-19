@@ -73,7 +73,7 @@ pub struct Position {
 
 impl Position {
     pub fn from_file_and_rank(file: usize, rank: usize) -> Position {
-        if file > file::H || rank > rank::EIGHT {
+        if !file::valid(file as i32) || !rank::valid(rank as i32) {
             panic!("Passed an invalid file or rank value into from_file_and_rank().");
         }
 
@@ -85,7 +85,7 @@ impl Position {
         let new_file = start.file() as i32 + offset.file_offset;
         let new_rank = start.rank() as i32 + offset.rank_offset;
 
-        if new_file < 0 || new_file > 7 || new_rank < 0 || new_rank > 7 {
+        if !file::valid(new_file) || !rank::valid(new_rank) {
             return None;
         }
 
@@ -100,11 +100,11 @@ impl Position {
     }
 
     pub fn rank(&self) -> usize {
-        self.position / 8
+        self.position / rank::LENGTH
     }
 
     pub fn file(&self) -> usize {
-        self.position % 8
+        self.position % file::LENGTH
     }
 }
 

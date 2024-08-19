@@ -3,21 +3,17 @@ pub mod position;
 pub mod rank;
 pub mod utils;
 
+use std::collections::HashSet;
+
 use crate::piece::{Piece, PieceType, Side};
-use position::Position;
+use position::{Position, PositionOffset};
 
 const BOARD_SIZE: usize = 64;
 const EMPTY: BoardPosition = BoardPosition { opt_piece: None };
 
-pub struct BoardPosition {
+struct BoardPosition {
     opt_piece: Option<Piece>,
 }
-
-#[derive(Eq, PartialEq, Debug, Clone)]
-pub enum PositionState {
-    Piece(Side),
-    Empty
-  }
 
 impl BoardPosition {
     pub fn new(opt_piece: Option<Piece>) -> BoardPosition {
@@ -32,13 +28,6 @@ impl BoardPosition {
 
     pub fn empty() -> BoardPosition {
         EMPTY
-    }
-
-    pub fn state(&self) -> PositionState {
-        match &self.opt_piece {
-            Some(piece) => PositionState::Piece(piece.side.clone()),
-            None => PositionState::Empty
-        }
     }
 
     pub fn get_piece(&self) -> &Option<Piece> {
@@ -117,8 +106,26 @@ impl Board {
         Board::from(pieces)
     }
 
-    pub fn get_position_state(&self, position: &Position) -> PositionState {
-        self.positions[position.value()].state()
+    fn get_board_position(&self, position: &Position) -> &BoardPosition {
+        &self.positions[position.value()]
+    }
+
+    pub fn is_occupiable_position(&self, position: &Position, side: &Side) -> bool {
+        match &self.get_board_position(position).opt_piece {
+            Some(piece) => piece.side != *side,
+            None => true,
+        }
+    }
+
+    pub fn contains_piece(&self, position: &Position) -> bool {
+        self.get_board_position(position).opt_piece.is_none()
+    }
+
+    pub fn contains_enemy_piece(&self, position: &Position, side: &Side) -> bool {
+        match &self.get_board_position(position).opt_piece {
+            Some(piece) => piece.side != *side,
+            None => false,
+        }
     }
 
     pub fn add_piece(&mut self, piece: Piece, position: Position) {
@@ -132,12 +139,190 @@ impl Board {
     }
 
     pub fn move_piece(&mut self, start: &Position, end: &Position) {
-        if utils::valid_move(&self, start, end) {
+        if self.valid_move(start, end) {
             let start_position = &mut self.positions[start.value()];
             let opt_moving_piece = start_position.take_piece();
-    
+
             let end_position = &mut self.positions[end.value()];
             end_position.set(opt_moving_piece);
+        }
+    }
+
+    pub fn get_moves(&self, piece: &Piece, position: &Position) -> HashSet<Position> {
+        let valid_positions = match piece.piece_type {
+            PieceType::Pawn => self.get_pawn_moves(position, &piece.side),
+            PieceType::Rook => self.get_rook_moves(position, &piece.side),
+            PieceType::Knight => self.get_knight_moves(position, &piece.side),
+            PieceType::Bishop => self.get_bishop_moves(position, &piece.side),
+            PieceType::King => self.get_king_moves(position, &piece.side),
+            PieceType::Queen => self.get_queen_moves(position, &piece.side),
+        };
+
+        valid_positions
+    }
+
+    pub fn get_pawn_moves(&self, position: &Position, side: &Side) -> HashSet<Position> {
+        let mut valid_positions = HashSet::new();
+
+        let front_offset = if *side == Side::White {
+            PositionOffset::new(0, 1)
+        } else {
+            PositionOffset::new(0, -1)
+        };
+
+        let left_diagonal_offset = if *side == Side::White {
+            PositionOffset::new(-1, 1)
+        } else {
+            PositionOffset::new(1, -1)
+        };
+
+        let right_diagonal_offset = if *side == Side::White {
+            PositionOffset::new(1, 1)
+        } else {
+            PositionOffset::new(-1, -1)
+        };
+
+        let forward_move = |new_position: &Position| !self.contains_piece(new_position);
+        let diagonal_move =
+            |new_position: &Position| !self.contains_enemy_piece(new_position, &side);
+
+        if let Some(new_position) = utils::get_if_valid(&position, front_offset, forward_move) {
+            valid_positions.insert(new_position);
+        }
+
+        if let Some(new_position) =
+            utils::get_if_valid(&position, left_diagonal_offset, diagonal_move)
+        {
+            valid_positions.insert(new_position);
+        }
+
+        if let Some(new_position) =
+            utils::get_if_valid(&position, right_diagonal_offset, diagonal_move)
+        {
+            valid_positions.insert(new_position);
+        }
+
+        return valid_positions;
+    }
+
+    pub fn get_rook_moves(&self, position: &Position, side: &Side) -> HashSet<Position> {
+        self.get_linear_moves(position, side)
+    }
+
+    pub fn get_knight_moves(&self, position: &Position, side: &Side) -> HashSet<Position> {
+        let mut valid_positions = HashSet::new();
+
+        let filter = |new_position: &Position| self.is_occupiable_position(&new_position, side);
+
+        let offsets = vec![
+            // North East
+            PositionOffset::new(1, 2),
+            PositionOffset::new(2, 1),
+            // South East
+            PositionOffset::new(1, -2),
+            PositionOffset::new(2, -1),
+            // North West
+            PositionOffset::new(-1, 2),
+            PositionOffset::new(-2, 1),
+            // South West
+            PositionOffset::new(-2, -1),
+            PositionOffset::new(-1, -2)
+        ];
+
+        for offset in offsets {
+            if let Some(new_position) = utils::get_if_valid(&position, offset, filter) {
+                valid_positions.insert(new_position);
+            }
+        }
+
+        return valid_positions;
+    }
+
+    pub fn get_bishop_moves(&self, position: &Position, side: &Side) -> HashSet<Position> {
+        self.get_diagonal_moves(position, side)
+    }
+
+    pub fn get_queen_moves(&self, position: &Position, side: &Side) -> HashSet<Position> {
+        let mut moves = self.get_linear_moves(position, side);
+
+        let diagonal_moves = self.get_diagonal_moves(position, side);
+        moves.extend(diagonal_moves);
+
+        moves
+    }
+
+    pub fn get_king_moves(&self, position: &Position, side: &Side) -> HashSet<Position> {
+        let mut valid_positions = HashSet::new();
+
+        let filter = |new_position: &Position| self.is_occupiable_position(&new_position, side);
+
+        let offsets = vec![
+            PositionOffset::new(1, 0),
+            PositionOffset::new(0, 1),
+            PositionOffset::new(-1, 0),
+            PositionOffset::new(0, -1),
+            PositionOffset::new(1, 1),
+            PositionOffset::new(-1, 1),
+            PositionOffset::new(1, -1),
+            PositionOffset::new(-1, -1)
+        ];
+
+        for offset in offsets {
+            if let Some(new_position) = utils::get_if_valid(&position, offset, filter) {
+                valid_positions.insert(new_position);
+            }
+        }
+
+        return valid_positions;
+    }
+
+    pub fn get_diagonal_moves(&self, position: &Position, side: &Side) -> HashSet<Position> {
+        let mut valid_positions = HashSet::new();
+
+        let filter = |new_position: &Position| self.is_occupiable_position(&new_position, side);
+
+        // Right & Up
+        utils::add_while_valid(position, 1, 1, filter, &mut valid_positions);
+
+        // Left & Up
+        utils::add_while_valid(position, -1, 1, filter, &mut valid_positions);
+
+        // Right & Down
+        utils::add_while_valid(position, 1, -1, filter, &mut valid_positions);
+
+        // Left & Down
+        utils::add_while_valid(position, -1, -1, filter, &mut valid_positions);
+
+        valid_positions
+    }
+
+    pub fn get_linear_moves(&self, position: &Position, side: &Side) -> HashSet<Position> {
+        let mut valid_positions = HashSet::new();
+
+        let filter = |new_position: &Position| self.is_occupiable_position(&new_position, side);
+
+        // Up
+        utils::add_while_valid(position, 0, 1, filter, &mut valid_positions);
+
+        // Down
+        utils::add_while_valid(position, 0, -1, filter, &mut valid_positions);
+
+        // Right
+        utils::add_while_valid(position, 1, 0, filter, &mut valid_positions);
+
+        // Left
+        utils::add_while_valid(position, -1, 0, filter, &mut valid_positions);
+
+        valid_positions
+    }
+
+    pub fn valid_move(&self, start: &Position, end: &Position) -> bool {
+        match self.get_board_position(start).get_piece() {
+            Some(piece) => {
+                let valid_moves = self.get_moves(piece, start);
+                valid_moves.contains(end)
+            }
+            None => false,
         }
     }
 }

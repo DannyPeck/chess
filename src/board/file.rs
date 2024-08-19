@@ -9,6 +9,10 @@ pub const H: usize = 7;
 
 pub const LENGTH: usize = 8;
 
+pub fn valid(file: i32) -> bool {
+    file >= A as i32 && file <= H as i32
+}
+
 pub fn to_char(file: usize) -> char {
     match file {
         A => 'a',
