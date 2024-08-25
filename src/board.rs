@@ -177,9 +177,10 @@ impl Board {
         self.current_turn = match self.current_turn {
             Side::White => Side::Black,
             Side::Black => {
+                // TODO: Update half moves once we have check detection.
                 self.full_moves += 1;
                 Side::White
-            },
+            }
         };
     }
 
@@ -225,24 +226,84 @@ impl Board {
         }
     }
 
-    pub fn add_piece(&mut self, piece: Piece, position: Position) {
-        self.positions[position.value()] = BoardPosition::from(piece);
+    pub fn is_en_passant_target(&self, position: &Position) -> bool {
+        match &self.en_passant_target {
+            Some(en_passant_target) => position == en_passant_target,
+            None => false,
+        }
+    }
+
+    fn set_position(&mut self, position: &Position, opt_piece: Option<Piece>) {
+        let board_position = &mut self.positions[position.value()];
+        board_position.set(opt_piece);
+    }
+
+    pub fn add_piece(&mut self, piece: Piece, position: &Position) {
+        self.set_position(&position, Some(piece));
     }
 
     pub fn add_pieces(&mut self, pieces: Vec<(Piece, Position)>) {
         for (piece, position) in pieces {
-            self.add_piece(piece, position);
+            self.add_piece(piece, &position);
+        }
+    }
+
+    fn take_piece(&mut self, position: &Position) -> Option<Piece> {
+        self.positions[position.value()].take_piece()
+    }
+
+    fn detect_en_passant_target(&self, moving_piece: &Piece, start: &Position, end: &Position) -> Option<Position> {
+        match moving_piece {
+            Piece {
+                piece_type: PieceType::Pawn,
+                side: Side::White,
+            } => {
+                if end.rank() - start.rank() == 2 {
+                    Position::from_offset(start, &Offset::new(0, 1))
+                } else {
+                    None
+                }
+            }
+            Piece {
+                piece_type: PieceType::Pawn,
+                side: Side::Black,
+            } => {
+                if start.rank() - end.rank() == 2 {
+                    Position::from_offset(start, &Offset::new(0, -1))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn detect_en_passant_capture(&self, moving_piece: &Piece, end: &Position) -> Option<Position> {
+        if moving_piece.piece_type == PieceType::Pawn && self.is_en_passant_target(end) {
+            match moving_piece.side {
+                Side::White => Position::from_offset(end, &Offset::new(0, -1)),
+                Side::Black => Position::from_offset(end, &Offset::new(0, 1)),
+            }
+        } else {
+            None
         }
     }
 
     pub fn move_piece(&mut self, start: &Position, end: &Position) -> bool {
         let valid_move = self.valid_move(start, end);
         if valid_move {
-            let start_position = &mut self.positions[start.value()];
-            let opt_moving_piece = start_position.take_piece();
+            let moving_piece = self.take_piece(start).unwrap();
 
-            let end_position = &mut self.positions[end.value()];
-            end_position.set(opt_moving_piece);
+            // Special handling for en passant because the position of the captured piece is not on the end position.
+            // Note that this must happen before we update the en passant target.
+            if let Some(en_passant_capture) = self.detect_en_passant_capture(&moving_piece, end) {
+                self.set_position(&en_passant_capture, None);
+            }
+
+            // Detect en passant and set the target.
+            self.en_passant_target = self.detect_en_passant_target(&moving_piece, start, end);
+
+            self.set_position(end, Some(moving_piece));
 
             self.change_turn();
         }
@@ -291,7 +352,9 @@ impl Board {
         };
 
         let forward_move = |new_position: &Position| !self.contains_piece(new_position);
-        let diagonal_move = |new_position: &Position| self.contains_enemy_piece(new_position, side);
+        let diagonal_move = |new_position: &Position| {
+            self.contains_enemy_piece(new_position, side) || self.is_en_passant_target(new_position)
+        };
 
         if let Some(new_position) =
             utils::get_if_valid(&position, &forward_one_offset, forward_move)
