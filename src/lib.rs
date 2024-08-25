@@ -1,4 +1,5 @@
 pub mod board;
+pub mod fen;
 pub mod game;
 pub mod piece;
 
@@ -42,4 +43,11 @@ pub fn run() {
             _ => break,
         }
     }
+
+    let parsed_board =
+        fen::parse_fen("rnbqkbn1/1p1p1p2/6pr/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R w Kq - 0 7")
+            .unwrap();
+    let parsed_game = Game::new(parsed_board);
+
+    println!("{}", parsed_game.board);
 }

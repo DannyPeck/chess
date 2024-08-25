@@ -11,6 +11,7 @@ use position::{Offset, Position};
 const BOARD_SIZE: usize = 64;
 const EMPTY: BoardPosition = BoardPosition { opt_piece: None };
 
+#[derive(Debug)]
 struct BoardPosition {
     opt_piece: Option<Piece>,
 }
@@ -47,18 +48,60 @@ impl BoardPosition {
     }
 }
 
+#[derive(Debug)]
+pub struct CastleRights {
+    pub white_short_castle_rights: bool,
+    pub white_long_castle_rights: bool,
+    pub black_short_castle_rights: bool,
+    pub black_long_castle_rights: bool,
+}
+
+#[derive(Debug)]
 pub struct Board {
     positions: [BoardPosition; BOARD_SIZE],
+    current_turn: Side,
+    castle_rights: CastleRights,
+    en_passant_target: Option<Position>,
+    half_moves: u32,
+    full_moves: u32,
 }
 
 impl Board {
     pub fn empty() -> Board {
         let positions: [BoardPosition; BOARD_SIZE] = [EMPTY; BOARD_SIZE];
-        Board { positions }
+        Board {
+            positions,
+            current_turn: Side::White,
+            castle_rights: CastleRights {
+                white_short_castle_rights: true,
+                white_long_castle_rights: true,
+                black_short_castle_rights: true,
+                black_long_castle_rights: true,
+            },
+            en_passant_target: None,
+            half_moves: 0,
+            full_moves: 0,
+        }
     }
 
-    pub fn from(pieces: Vec<(Piece, Position)>) -> Board {
-        let mut board = Board::empty();
+    pub fn new(
+        pieces: Vec<(Piece, Position)>,
+        current_turn: Side,
+        castle_rights: CastleRights,
+        en_passant_target: Option<Position>,
+        half_moves: u32,
+        full_moves: u32,
+    ) -> Board {
+        let positions: [BoardPosition; BOARD_SIZE] = [EMPTY; BOARD_SIZE];
+        let mut board = Board {
+            positions,
+            current_turn,
+            castle_rights,
+            en_passant_target,
+            half_moves,
+            full_moves,
+        };
+
         board.add_pieces(pieces);
 
         board
@@ -103,7 +146,22 @@ impl Board {
         pieces.push((Piece::new(PieceType::King, Side::Black), Position::d8()));
         pieces.push((Piece::new(PieceType::Queen, Side::Black), Position::e8()));
 
-        Board::from(pieces)
+        let mut board = Board::empty();
+
+        board.add_pieces(pieces);
+
+        board
+    }
+
+    pub fn get_current_turn(&self) -> Side {
+        self.current_turn.clone()
+    }
+
+    pub fn change_turn(&mut self) {
+        self.current_turn = match self.current_turn {
+            Side::White => Side::Black,
+            Side::Black => Side::White,
+        };
     }
 
     fn get_board_position(&self, position: &Position) -> &BoardPosition {
@@ -196,8 +254,7 @@ impl Board {
         };
 
         let forward_move = |new_position: &Position| !self.contains_piece(new_position);
-        let diagonal_move =
-            |new_position: &Position| self.contains_enemy_piece(new_position, &side);
+        let diagonal_move = |new_position: &Position| self.contains_enemy_piece(new_position, side);
 
         if let Some(new_position) =
             utils::get_if_valid(&position, &forward_one_offset, forward_move)
@@ -233,7 +290,7 @@ impl Board {
     pub fn get_knight_moves(&self, position: &Position, side: &Side) -> HashSet<Position> {
         let mut valid_positions = HashSet::new();
 
-        let filter = |new_position: &Position| self.is_occupiable_position(&new_position, side);
+        let filter = |new_position: &Position| self.is_occupiable_position(new_position, side);
 
         let offsets = vec![
             // North East
@@ -275,7 +332,7 @@ impl Board {
     pub fn get_king_moves(&self, position: &Position, side: &Side) -> HashSet<Position> {
         let mut valid_positions = HashSet::new();
 
-        let filter = |new_position: &Position| self.is_occupiable_position(&new_position, side);
+        let filter = |new_position: &Position| self.is_occupiable_position(new_position, side);
 
         let offsets = vec![
             Offset::new(1, 0),
@@ -300,7 +357,7 @@ impl Board {
     pub fn get_diagonal_moves(&self, position: &Position, side: &Side) -> HashSet<Position> {
         let mut valid_positions = HashSet::new();
 
-        let filter = |new_position: &Position| self.is_occupiable_position(&new_position, side);
+        let filter = |new_position: &Position| self.is_occupiable_position(new_position, side);
 
         // Right & Up
         utils::add_while_valid(position, &Offset::new(1, 1), filter, &mut valid_positions);
@@ -320,7 +377,7 @@ impl Board {
     pub fn get_linear_moves(&self, position: &Position, side: &Side) -> HashSet<Position> {
         let mut valid_positions = HashSet::new();
 
-        let filter = |new_position: &Position| self.is_occupiable_position(&new_position, side);
+        let filter = |new_position: &Position| self.is_occupiable_position(new_position, side);
 
         // Up
         utils::add_while_valid(position, &Offset::new(0, 1), filter, &mut valid_positions);
@@ -339,11 +396,11 @@ impl Board {
 
     pub fn valid_move(&self, start: &Position, end: &Position) -> bool {
         match self.get_board_position(start).get_piece() {
-            Some(piece) => {
+            Some(piece) if piece.side == self.current_turn => {
                 let valid_moves = self.get_moves(piece, start);
                 valid_moves.contains(end)
             }
-            None => false,
+            _ => false,
         }
     }
 }
