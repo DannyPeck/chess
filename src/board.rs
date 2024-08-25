@@ -48,12 +48,28 @@ impl BoardPosition {
     }
 }
 
-#[derive(Debug)]
+#[derive(Eq, PartialEq, Debug)]
 pub struct CastleRights {
     pub white_short_castle_rights: bool,
     pub white_long_castle_rights: bool,
     pub black_short_castle_rights: bool,
     pub black_long_castle_rights: bool,
+}
+
+impl CastleRights {
+    pub fn new(
+        white_short_castle_rights: bool,
+        white_long_castle_rights: bool,
+        black_short_castle_rights: bool,
+        black_long_castle_rights: bool,
+    ) -> CastleRights {
+        CastleRights {
+            white_short_castle_rights, 
+            white_long_castle_rights,
+            black_short_castle_rights,
+            black_long_castle_rights
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -162,6 +178,22 @@ impl Board {
             Side::White => Side::Black,
             Side::Black => Side::White,
         };
+    }
+
+    pub fn get_castle_rights(&self) -> &CastleRights {
+        &self.castle_rights
+    }
+
+    pub fn get_en_passant_target(&self) -> &Option<Position> {
+        &self.en_passant_target
+    }
+
+    pub fn get_half_moves(&self) -> u32 {
+        self.half_moves
+    }
+
+    pub fn get_full_moves(&self) -> u32 {
+        self.full_moves
     }
 
     fn get_board_position(&self, position: &Position) -> &BoardPosition {

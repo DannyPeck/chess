@@ -67,9 +67,7 @@ pub const G8: usize = 62;
 pub const H8: usize = 63;
 
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]
-pub struct Position {
-    position: usize,
-}
+pub struct Position(usize);
 
 impl Position {
     pub fn from_file_and_rank(file: usize, rank: usize) -> Position {
@@ -78,7 +76,7 @@ impl Position {
         }
 
         let position = (rank * 8) + file;
-        Position { position }
+        Position(position)
     }
 
     pub fn from_offset(start: &Position, offset: &Offset) -> Option<Position> {
@@ -112,15 +110,15 @@ impl Position {
     }
 
     pub fn value(&self) -> usize {
-        self.position
+        self.0
     }
 
     pub fn rank(&self) -> usize {
-        self.position / rank::LENGTH
+        self.0 / rank::LENGTH
     }
 
     pub fn file(&self) -> usize {
-        self.position % file::LENGTH
+        self.0 % file::LENGTH
     }
 }
 
@@ -152,196 +150,196 @@ impl Offset {
 
 impl Position {
     pub fn a1() -> Position {
-        Position { position: A1 }
+        Position(A1)
     }
     pub fn a2() -> Position {
-        Position { position: A2 }
+        Position(A2)
     }
     pub fn a3() -> Position {
-        Position { position: A3 }
+        Position(A3)
     }
     pub fn a4() -> Position {
-        Position { position: A4 }
+        Position(A4)
     }
     pub fn a5() -> Position {
-        Position { position: A5 }
+        Position(A5)
     }
     pub fn a6() -> Position {
-        Position { position: A6 }
+        Position(A6)
     }
     pub fn a7() -> Position {
-        Position { position: A7 }
+        Position(A7)
     }
     pub fn a8() -> Position {
-        Position { position: A8 }
+        Position(A8)
     }
     pub fn b1() -> Position {
-        Position { position: B1 }
+        Position(B1)
     }
     pub fn b2() -> Position {
-        Position { position: B2 }
+        Position(B2)
     }
     pub fn b3() -> Position {
-        Position { position: B3 }
+        Position(B3)
     }
     pub fn b4() -> Position {
-        Position { position: B4 }
+        Position(B4)
     }
     pub fn b5() -> Position {
-        Position { position: B5 }
+        Position(B5)
     }
     pub fn b6() -> Position {
-        Position { position: B6 }
+        Position(B6)
     }
     pub fn b7() -> Position {
-        Position { position: B7 }
+        Position(B7)
     }
     pub fn b8() -> Position {
-        Position { position: B8 }
+        Position(B8)
     }
     pub fn c1() -> Position {
-        Position { position: C1 }
+        Position(C1)
     }
     pub fn c2() -> Position {
-        Position { position: C2 }
+        Position(C2)
     }
     pub fn c3() -> Position {
-        Position { position: C3 }
+        Position(C3)
     }
     pub fn c4() -> Position {
-        Position { position: C4 }
+        Position(C4)
     }
     pub fn c5() -> Position {
-        Position { position: C5 }
+        Position(C5)
     }
     pub fn c6() -> Position {
-        Position { position: C6 }
+        Position(C6)
     }
     pub fn c7() -> Position {
-        Position { position: C7 }
+        Position(C7)
     }
     pub fn c8() -> Position {
-        Position { position: C8 }
+        Position(C8)
     }
     pub fn d1() -> Position {
-        Position { position: D1 }
+        Position(D1)
     }
     pub fn d2() -> Position {
-        Position { position: D2 }
+        Position(D2)
     }
     pub fn d3() -> Position {
-        Position { position: D3 }
+        Position(D3)
     }
     pub fn d4() -> Position {
-        Position { position: D4 }
+        Position(D4)
     }
     pub fn d5() -> Position {
-        Position { position: D5 }
+        Position(D5)
     }
     pub fn d6() -> Position {
-        Position { position: D6 }
+        Position(D6)
     }
     pub fn d7() -> Position {
-        Position { position: D7 }
+        Position(D7)
     }
     pub fn d8() -> Position {
-        Position { position: D8 }
+        Position(D8)
     }
     pub fn e1() -> Position {
-        Position { position: E1 }
+        Position(E1)
     }
     pub fn e2() -> Position {
-        Position { position: E2 }
+        Position(E2)
     }
     pub fn e3() -> Position {
-        Position { position: E3 }
+        Position(E3)
     }
     pub fn e4() -> Position {
-        Position { position: E4 }
+        Position(E4)
     }
     pub fn e5() -> Position {
-        Position { position: E5 }
+        Position(E5)
     }
     pub fn e6() -> Position {
-        Position { position: E6 }
+        Position(E6)
     }
     pub fn e7() -> Position {
-        Position { position: E7 }
+        Position(E7)
     }
     pub fn e8() -> Position {
-        Position { position: E8 }
+        Position(E8)
     }
     pub fn f1() -> Position {
-        Position { position: F1 }
+        Position(F1)
     }
     pub fn f2() -> Position {
-        Position { position: F2 }
+        Position(F2)
     }
     pub fn f3() -> Position {
-        Position { position: F3 }
+        Position(F3)
     }
     pub fn f4() -> Position {
-        Position { position: F4 }
+        Position(F4)
     }
     pub fn f5() -> Position {
-        Position { position: F5 }
+        Position(F5)
     }
     pub fn f6() -> Position {
-        Position { position: F6 }
+        Position(F6)
     }
     pub fn f7() -> Position {
-        Position { position: F7 }
+        Position(F7)
     }
     pub fn f8() -> Position {
-        Position { position: F8 }
+        Position(F8)
     }
     pub fn g1() -> Position {
-        Position { position: G1 }
+        Position(G1)
     }
     pub fn g2() -> Position {
-        Position { position: G2 }
+        Position(G2)
     }
     pub fn g3() -> Position {
-        Position { position: G3 }
+        Position(G3)
     }
     pub fn g4() -> Position {
-        Position { position: G4 }
+        Position(G4)
     }
     pub fn g5() -> Position {
-        Position { position: G5 }
+        Position(G5)
     }
     pub fn g6() -> Position {
-        Position { position: G6 }
+        Position(G6)
     }
     pub fn g7() -> Position {
-        Position { position: G7 }
+        Position(G7)
     }
     pub fn g8() -> Position {
-        Position { position: G8 }
+        Position(G8)
     }
     pub fn h1() -> Position {
-        Position { position: H1 }
+        Position(H1)
     }
     pub fn h2() -> Position {
-        Position { position: H2 }
+        Position(H2)
     }
     pub fn h3() -> Position {
-        Position { position: H3 }
+        Position(H3)
     }
     pub fn h4() -> Position {
-        Position { position: H4 }
+        Position(H4)
     }
     pub fn h5() -> Position {
-        Position { position: H5 }
+        Position(H5)
     }
     pub fn h6() -> Position {
-        Position { position: H6 }
+        Position(H6)
     }
     pub fn h7() -> Position {
-        Position { position: H7 }
+        Position(H7)
     }
     pub fn h8() -> Position {
-        Position { position: H8 }
+        Position(H8)
     }
 }
 
