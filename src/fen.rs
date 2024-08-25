@@ -185,51 +185,111 @@ mod tests {
         let fen = "rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3 0 6";
 
         let board = parse_fen(fen)?;
-        
+
         assert_eq!(*board.get_piece(&Position::a1()), None);
-        assert_eq!(*board.get_piece(&Position::b1()), Some(Piece::new(PieceType::Knight, Side::White)));
-        assert_eq!(*board.get_piece(&Position::c1()), Some(Piece::new(PieceType::Bishop, Side::White)));
-        assert_eq!(*board.get_piece(&Position::d1()), Some(Piece::new(PieceType::Queen, Side::White)));
-        assert_eq!(*board.get_piece(&Position::e1()), Some(Piece::new(PieceType::King, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::b1()),
+            Some(Piece::new(PieceType::Knight, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::c1()),
+            Some(Piece::new(PieceType::Bishop, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::d1()),
+            Some(Piece::new(PieceType::Queen, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::e1()),
+            Some(Piece::new(PieceType::King, Side::White))
+        );
         assert_eq!(*board.get_piece(&Position::f1()), None);
         assert_eq!(*board.get_piece(&Position::g1()), None);
-        assert_eq!(*board.get_piece(&Position::h1()), Some(Piece::new(PieceType::Rook, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::h1()),
+            Some(Piece::new(PieceType::Rook, Side::White))
+        );
 
         assert_eq!(*board.get_piece(&Position::a2()), None);
-        assert_eq!(*board.get_piece(&Position::b2()), Some(Piece::new(PieceType::Pawn, Side::White)));
-        assert_eq!(*board.get_piece(&Position::c2()), Some(Piece::new(PieceType::Pawn, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::b2()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::c2()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
         assert_eq!(*board.get_piece(&Position::d2()), None);
         assert_eq!(*board.get_piece(&Position::e2()), None);
-        assert_eq!(*board.get_piece(&Position::f2()), Some(Piece::new(PieceType::Pawn, Side::White)));
-        assert_eq!(*board.get_piece(&Position::g2()), Some(Piece::new(PieceType::Pawn, Side::White)));
-        assert_eq!(*board.get_piece(&Position::h2()), Some(Piece::new(PieceType::Pawn, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::f2()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::g2()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::h2()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
 
-        assert_eq!(*board.get_piece(&Position::a3()), Some(Piece::new(PieceType::Rook, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::a3()),
+            Some(Piece::new(PieceType::Rook, Side::White))
+        );
         assert_eq!(*board.get_piece(&Position::b3()), None);
         assert_eq!(*board.get_piece(&Position::c3()), None);
         assert_eq!(*board.get_piece(&Position::d3()), None);
         assert_eq!(*board.get_piece(&Position::e3()), None);
-        assert_eq!(*board.get_piece(&Position::f3()), Some(Piece::new(PieceType::Knight, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::f3()),
+            Some(Piece::new(PieceType::Knight, Side::White))
+        );
         assert_eq!(*board.get_piece(&Position::g3()), None);
         assert_eq!(*board.get_piece(&Position::h3()), None);
 
-        assert_eq!(*board.get_piece(&Position::a4()), Some(Piece::new(PieceType::Pawn, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::a4()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
         assert_eq!(*board.get_piece(&Position::b4()), None);
         assert_eq!(*board.get_piece(&Position::c4()), None);
-        assert_eq!(*board.get_piece(&Position::d4()), Some(Piece::new(PieceType::Pawn, Side::White)));
-        assert_eq!(*board.get_piece(&Position::e4()), Some(Piece::new(PieceType::Pawn, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::d4()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::e4()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
         assert_eq!(*board.get_piece(&Position::f4()), None);
         assert_eq!(*board.get_piece(&Position::g4()), None);
         assert_eq!(*board.get_piece(&Position::h4()), None);
 
-        assert_eq!(*board.get_piece(&Position::a5()), Some(Piece::new(PieceType::Pawn, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::b5()), Some(Piece::new(PieceType::Bishop, Side::White)));
-        assert_eq!(*board.get_piece(&Position::c5()), Some(Piece::new(PieceType::Pawn, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::a5()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::b5()),
+            Some(Piece::new(PieceType::Bishop, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::c5()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
         assert_eq!(*board.get_piece(&Position::d5()), None);
-        assert_eq!(*board.get_piece(&Position::e5()), Some(Piece::new(PieceType::Pawn, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::e5()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
         assert_eq!(*board.get_piece(&Position::f5()), None);
         assert_eq!(*board.get_piece(&Position::g5()), None);
-        assert_eq!(*board.get_piece(&Position::h5()), Some(Piece::new(PieceType::Pawn, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::h5()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
 
         assert_eq!(*board.get_piece(&Position::a6()), None);
         assert_eq!(*board.get_piece(&Position::b6()), None);
@@ -238,34 +298,73 @@ mod tests {
         assert_eq!(*board.get_piece(&Position::e6()), None);
         assert_eq!(*board.get_piece(&Position::f6()), None);
         assert_eq!(*board.get_piece(&Position::g6()), None);
-        assert_eq!(*board.get_piece(&Position::h6()), Some(Piece::new(PieceType::Rook, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::h6()),
+            Some(Piece::new(PieceType::Rook, Side::Black))
+        );
 
         assert_eq!(*board.get_piece(&Position::a7()), None);
-        assert_eq!(*board.get_piece(&Position::b7()), Some(Piece::new(PieceType::Pawn, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::b7()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
         assert_eq!(*board.get_piece(&Position::c7()), None);
-        assert_eq!(*board.get_piece(&Position::d7()), Some(Piece::new(PieceType::Pawn, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::d7()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
         assert_eq!(*board.get_piece(&Position::e7()), None);
-        assert_eq!(*board.get_piece(&Position::f7()), Some(Piece::new(PieceType::Pawn, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::g7()), Some(Piece::new(PieceType::Pawn, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::f7()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::g7()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
         assert_eq!(*board.get_piece(&Position::h7()), None);
 
-        assert_eq!(*board.get_piece(&Position::a8()), Some(Piece::new(PieceType::Rook, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::b8()), Some(Piece::new(PieceType::Knight, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::c8()), Some(Piece::new(PieceType::Bishop, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::d8()), Some(Piece::new(PieceType::Queen, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::e8()), Some(Piece::new(PieceType::King, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::f8()), Some(Piece::new(PieceType::Bishop, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::g8()), Some(Piece::new(PieceType::Knight, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::a8()),
+            Some(Piece::new(PieceType::Rook, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::b8()),
+            Some(Piece::new(PieceType::Knight, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::c8()),
+            Some(Piece::new(PieceType::Bishop, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::d8()),
+            Some(Piece::new(PieceType::Queen, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::e8()),
+            Some(Piece::new(PieceType::King, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::f8()),
+            Some(Piece::new(PieceType::Bishop, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::g8()),
+            Some(Piece::new(PieceType::Knight, Side::Black))
+        );
         assert_eq!(*board.get_piece(&Position::h8()), None);
 
         assert_eq!(board.get_current_turn(), Side::Black);
 
-        assert_eq!(*board.get_castle_rights(), CastleRights::new(true, false, false, true));
+        assert_eq!(
+            *board.get_castle_rights(),
+            CastleRights::new(true, false, false, true)
+        );
 
         assert_eq!(*board.get_en_passant_target(), Some(Position::d3()));
 
         assert_eq!(board.get_half_moves(), 0);
-        
+
         assert_eq!(board.get_full_moves(), 6);
 
         Ok(())
@@ -274,10 +373,14 @@ mod tests {
     #[test]
     fn parse_fen_invalid() -> Result<(), ParseError> {
         // Missing full moves
-        assert!(parse_fen("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3 0").is_err());
+        assert!(
+            parse_fen("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3 0").is_err()
+        );
 
         // Missing half moves
-        assert!(parse_fen("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3").is_err());
+        assert!(
+            parse_fen("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3").is_err()
+        );
 
         // Missing en passant target
         assert!(parse_fen("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq").is_err());
@@ -296,56 +399,117 @@ mod tests {
 
     #[test]
     fn parse_piece_notation_valid() -> Result<(), ParseError> {
-        let pieces = parse_piece_placement("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R")?;
+        let pieces =
+            parse_piece_placement("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R")?;
 
         let mut board = Board::empty();
 
         board.add_pieces(pieces);
 
         assert_eq!(*board.get_piece(&Position::a1()), None);
-        assert_eq!(*board.get_piece(&Position::b1()), Some(Piece::new(PieceType::Knight, Side::White)));
-        assert_eq!(*board.get_piece(&Position::c1()), Some(Piece::new(PieceType::Bishop, Side::White)));
-        assert_eq!(*board.get_piece(&Position::d1()), Some(Piece::new(PieceType::Queen, Side::White)));
-        assert_eq!(*board.get_piece(&Position::e1()), Some(Piece::new(PieceType::King, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::b1()),
+            Some(Piece::new(PieceType::Knight, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::c1()),
+            Some(Piece::new(PieceType::Bishop, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::d1()),
+            Some(Piece::new(PieceType::Queen, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::e1()),
+            Some(Piece::new(PieceType::King, Side::White))
+        );
         assert_eq!(*board.get_piece(&Position::f1()), None);
         assert_eq!(*board.get_piece(&Position::g1()), None);
-        assert_eq!(*board.get_piece(&Position::h1()), Some(Piece::new(PieceType::Rook, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::h1()),
+            Some(Piece::new(PieceType::Rook, Side::White))
+        );
 
         assert_eq!(*board.get_piece(&Position::a2()), None);
-        assert_eq!(*board.get_piece(&Position::b2()), Some(Piece::new(PieceType::Pawn, Side::White)));
-        assert_eq!(*board.get_piece(&Position::c2()), Some(Piece::new(PieceType::Pawn, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::b2()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::c2()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
         assert_eq!(*board.get_piece(&Position::d2()), None);
         assert_eq!(*board.get_piece(&Position::e2()), None);
-        assert_eq!(*board.get_piece(&Position::f2()), Some(Piece::new(PieceType::Pawn, Side::White)));
-        assert_eq!(*board.get_piece(&Position::g2()), Some(Piece::new(PieceType::Pawn, Side::White)));
-        assert_eq!(*board.get_piece(&Position::h2()), Some(Piece::new(PieceType::Pawn, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::f2()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::g2()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::h2()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
 
-        assert_eq!(*board.get_piece(&Position::a3()), Some(Piece::new(PieceType::Rook, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::a3()),
+            Some(Piece::new(PieceType::Rook, Side::White))
+        );
         assert_eq!(*board.get_piece(&Position::b3()), None);
         assert_eq!(*board.get_piece(&Position::c3()), None);
         assert_eq!(*board.get_piece(&Position::d3()), None);
         assert_eq!(*board.get_piece(&Position::e3()), None);
-        assert_eq!(*board.get_piece(&Position::f3()), Some(Piece::new(PieceType::Knight, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::f3()),
+            Some(Piece::new(PieceType::Knight, Side::White))
+        );
         assert_eq!(*board.get_piece(&Position::g3()), None);
         assert_eq!(*board.get_piece(&Position::h3()), None);
 
-        assert_eq!(*board.get_piece(&Position::a4()), Some(Piece::new(PieceType::Pawn, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::a4()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
         assert_eq!(*board.get_piece(&Position::b4()), None);
         assert_eq!(*board.get_piece(&Position::c4()), None);
-        assert_eq!(*board.get_piece(&Position::d4()), Some(Piece::new(PieceType::Pawn, Side::White)));
-        assert_eq!(*board.get_piece(&Position::e4()), Some(Piece::new(PieceType::Pawn, Side::White)));
+        assert_eq!(
+            *board.get_piece(&Position::d4()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::e4()),
+            Some(Piece::new(PieceType::Pawn, Side::White))
+        );
         assert_eq!(*board.get_piece(&Position::f4()), None);
         assert_eq!(*board.get_piece(&Position::g4()), None);
         assert_eq!(*board.get_piece(&Position::h4()), None);
 
-        assert_eq!(*board.get_piece(&Position::a5()), Some(Piece::new(PieceType::Pawn, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::b5()), Some(Piece::new(PieceType::Bishop, Side::White)));
-        assert_eq!(*board.get_piece(&Position::c5()), Some(Piece::new(PieceType::Pawn, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::a5()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::b5()),
+            Some(Piece::new(PieceType::Bishop, Side::White))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::c5()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
         assert_eq!(*board.get_piece(&Position::d5()), None);
-        assert_eq!(*board.get_piece(&Position::e5()), Some(Piece::new(PieceType::Pawn, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::e5()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
         assert_eq!(*board.get_piece(&Position::f5()), None);
         assert_eq!(*board.get_piece(&Position::g5()), None);
-        assert_eq!(*board.get_piece(&Position::h5()), Some(Piece::new(PieceType::Pawn, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::h5()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
 
         assert_eq!(*board.get_piece(&Position::a6()), None);
         assert_eq!(*board.get_piece(&Position::b6()), None);
@@ -354,24 +518,60 @@ mod tests {
         assert_eq!(*board.get_piece(&Position::e6()), None);
         assert_eq!(*board.get_piece(&Position::f6()), None);
         assert_eq!(*board.get_piece(&Position::g6()), None);
-        assert_eq!(*board.get_piece(&Position::h6()), Some(Piece::new(PieceType::Rook, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::h6()),
+            Some(Piece::new(PieceType::Rook, Side::Black))
+        );
 
         assert_eq!(*board.get_piece(&Position::a7()), None);
-        assert_eq!(*board.get_piece(&Position::b7()), Some(Piece::new(PieceType::Pawn, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::b7()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
         assert_eq!(*board.get_piece(&Position::c7()), None);
-        assert_eq!(*board.get_piece(&Position::d7()), Some(Piece::new(PieceType::Pawn, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::d7()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
         assert_eq!(*board.get_piece(&Position::e7()), None);
-        assert_eq!(*board.get_piece(&Position::f7()), Some(Piece::new(PieceType::Pawn, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::g7()), Some(Piece::new(PieceType::Pawn, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::f7()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::g7()),
+            Some(Piece::new(PieceType::Pawn, Side::Black))
+        );
         assert_eq!(*board.get_piece(&Position::h7()), None);
 
-        assert_eq!(*board.get_piece(&Position::a8()), Some(Piece::new(PieceType::Rook, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::b8()), Some(Piece::new(PieceType::Knight, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::c8()), Some(Piece::new(PieceType::Bishop, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::d8()), Some(Piece::new(PieceType::Queen, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::e8()), Some(Piece::new(PieceType::King, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::f8()), Some(Piece::new(PieceType::Bishop, Side::Black)));
-        assert_eq!(*board.get_piece(&Position::g8()), Some(Piece::new(PieceType::Knight, Side::Black)));
+        assert_eq!(
+            *board.get_piece(&Position::a8()),
+            Some(Piece::new(PieceType::Rook, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::b8()),
+            Some(Piece::new(PieceType::Knight, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::c8()),
+            Some(Piece::new(PieceType::Bishop, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::d8()),
+            Some(Piece::new(PieceType::Queen, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::e8()),
+            Some(Piece::new(PieceType::King, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::f8()),
+            Some(Piece::new(PieceType::Bishop, Side::Black))
+        );
+        assert_eq!(
+            *board.get_piece(&Position::g8()),
+            Some(Piece::new(PieceType::Knight, Side::Black))
+        );
         assert_eq!(*board.get_piece(&Position::h8()), None);
 
         Ok(())
@@ -380,16 +580,24 @@ mod tests {
     #[test]
     fn parse_piece_notation_invalid() {
         // Removed a piece from the 8th rank
-        assert!(parse_piece_placement("nbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R").is_err());
+        assert!(
+            parse_piece_placement("nbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R")
+                .is_err()
+        );
 
         // Rank exceeds board length
-        assert!(parse_piece_placement("rnbq5/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R").is_err());
+        assert!(
+            parse_piece_placement("rnbq5/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R").is_err()
+        );
 
         // Insufficient number of ranks
         assert!(parse_piece_placement("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP").is_err());
 
         // Invalid piece notation
-        assert!(parse_piece_placement("Xnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R").is_err());
+        assert!(
+            parse_piece_placement("Xnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R")
+                .is_err()
+        );
     }
 
     #[test]
@@ -408,27 +616,78 @@ mod tests {
     #[test]
     fn parse_castling_availability_test() -> Result<(), ParseError> {
         // All combinations
-        assert_eq!(parse_castling_availability("KQkq")?, CastleRights::new(true, true, true, true));
-        assert_eq!(parse_castling_availability("KQk")?, CastleRights::new(true, true, true, false));
-        assert_eq!(parse_castling_availability("KQq")?, CastleRights::new(true, true, false, true));
-        assert_eq!(parse_castling_availability("Kkq")?, CastleRights::new(true, false, true, true));
-        assert_eq!(parse_castling_availability("Qkq")?, CastleRights::new(false, true, true, true));
-        assert_eq!(parse_castling_availability("KQ")?, CastleRights::new(true, true, false, false));
-        assert_eq!(parse_castling_availability("Kq")?, CastleRights::new(true, false, false, true));
-        assert_eq!(parse_castling_availability("Kk")?, CastleRights::new(true, false, true, false));
-        assert_eq!(parse_castling_availability("kq")?, CastleRights::new(false, false, true, true));
-        assert_eq!(parse_castling_availability("Qk")?, CastleRights::new(false, true, true, false));
-        assert_eq!(parse_castling_availability("Qq")?, CastleRights::new(false, true, false, true));
-        assert_eq!(parse_castling_availability("K")?, CastleRights::new(true, false, false, false));
-        assert_eq!(parse_castling_availability("k")?, CastleRights::new(false, false, true, false));
-        assert_eq!(parse_castling_availability("Q")?, CastleRights::new(false, true, false, false));
-        assert_eq!(parse_castling_availability("q")?, CastleRights::new(false, false, false, true));
+        assert_eq!(
+            parse_castling_availability("KQkq")?,
+            CastleRights::new(true, true, true, true)
+        );
+        assert_eq!(
+            parse_castling_availability("KQk")?,
+            CastleRights::new(true, true, true, false)
+        );
+        assert_eq!(
+            parse_castling_availability("KQq")?,
+            CastleRights::new(true, true, false, true)
+        );
+        assert_eq!(
+            parse_castling_availability("Kkq")?,
+            CastleRights::new(true, false, true, true)
+        );
+        assert_eq!(
+            parse_castling_availability("Qkq")?,
+            CastleRights::new(false, true, true, true)
+        );
+        assert_eq!(
+            parse_castling_availability("KQ")?,
+            CastleRights::new(true, true, false, false)
+        );
+        assert_eq!(
+            parse_castling_availability("Kq")?,
+            CastleRights::new(true, false, false, true)
+        );
+        assert_eq!(
+            parse_castling_availability("Kk")?,
+            CastleRights::new(true, false, true, false)
+        );
+        assert_eq!(
+            parse_castling_availability("kq")?,
+            CastleRights::new(false, false, true, true)
+        );
+        assert_eq!(
+            parse_castling_availability("Qk")?,
+            CastleRights::new(false, true, true, false)
+        );
+        assert_eq!(
+            parse_castling_availability("Qq")?,
+            CastleRights::new(false, true, false, true)
+        );
+        assert_eq!(
+            parse_castling_availability("K")?,
+            CastleRights::new(true, false, false, false)
+        );
+        assert_eq!(
+            parse_castling_availability("k")?,
+            CastleRights::new(false, false, true, false)
+        );
+        assert_eq!(
+            parse_castling_availability("Q")?,
+            CastleRights::new(false, true, false, false)
+        );
+        assert_eq!(
+            parse_castling_availability("q")?,
+            CastleRights::new(false, false, false, true)
+        );
 
         // None
-        assert_eq!(parse_castling_availability("-")?, CastleRights::new(false, false, false, false));
+        assert_eq!(
+            parse_castling_availability("-")?,
+            CastleRights::new(false, false, false, false)
+        );
 
         // Different order is valid
-        assert_eq!(parse_castling_availability("qkQK")?, CastleRights::new(true, true, true, true));
+        assert_eq!(
+            parse_castling_availability("qkQK")?,
+            CastleRights::new(true, true, true, true)
+        );
 
         Ok(())
     }
@@ -436,7 +695,7 @@ mod tests {
     #[test]
     fn parse_en_passant_target_test() -> Result<(), ParseError> {
         assert_eq!(parse_en_passant_target("d3")?, Some(Position::d3()));
-        assert_eq!(parse_en_passant_target("-")?,  None);
+        assert_eq!(parse_en_passant_target("-")?, None);
 
         assert!(parse_en_passant_target("a9").is_err());
 

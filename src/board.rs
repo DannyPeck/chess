@@ -64,10 +64,10 @@ impl CastleRights {
         black_long_castle_rights: bool,
     ) -> CastleRights {
         CastleRights {
-            white_short_castle_rights, 
+            white_short_castle_rights,
             white_long_castle_rights,
             black_short_castle_rights,
-            black_long_castle_rights
+            black_long_castle_rights,
         }
     }
 }
