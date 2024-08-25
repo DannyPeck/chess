@@ -96,7 +96,7 @@ impl Board {
             },
             en_passant_target: None,
             half_moves: 0,
-            full_moves: 0,
+            full_moves: 1,
         }
     }
 
@@ -159,8 +159,8 @@ impl Board {
         pieces.push((Piece::new(PieceType::Knight, Side::Black), Position::g8()));
         pieces.push((Piece::new(PieceType::Bishop, Side::Black), Position::c8()));
         pieces.push((Piece::new(PieceType::Bishop, Side::Black), Position::f8()));
-        pieces.push((Piece::new(PieceType::King, Side::Black), Position::d8()));
-        pieces.push((Piece::new(PieceType::Queen, Side::Black), Position::e8()));
+        pieces.push((Piece::new(PieceType::King, Side::Black), Position::e8()));
+        pieces.push((Piece::new(PieceType::Queen, Side::Black), Position::d8()));
 
         let mut board = Board::empty();
 
@@ -173,10 +173,13 @@ impl Board {
         self.current_turn.clone()
     }
 
-    pub fn change_turn(&mut self) {
+    fn change_turn(&mut self) {
         self.current_turn = match self.current_turn {
             Side::White => Side::Black,
-            Side::Black => Side::White,
+            Side::Black => {
+                self.full_moves += 1;
+                Side::White
+            },
         };
     }
 
@@ -240,6 +243,8 @@ impl Board {
 
             let end_position = &mut self.positions[end.value()];
             end_position.set(opt_moving_piece);
+
+            self.change_turn();
         }
 
         valid_move

@@ -44,6 +44,9 @@ pub fn run() {
         }
     }
 
+    let current_fen = fen::generate_fen(&game.board);
+    println!("{current_fen}");
+
     let parsed_board =
         fen::parse_fen("rnbqkbn1/1p1p1p2/6pr/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R w Kq - 0 7")
             .unwrap();

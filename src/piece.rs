@@ -24,6 +24,17 @@ impl Side {
     }
 }
 
+impl std::fmt::Display for Side {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let notation = match self {
+            Side::White => String::from("w"),
+            Side::Black => String::from("b"),
+        };
+
+        write!(f, "{notation}")
+    }
+}
+
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct Piece {
     pub piece_type: PieceType,

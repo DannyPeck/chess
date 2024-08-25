@@ -10,12 +10,6 @@ impl Game {
     }
 
     pub fn attempt_move(&mut self, start_position: &Position, end_position: &Position) -> bool {
-        let valid = self.board.move_piece(start_position, end_position);
-
-        if valid {
-            self.board.change_turn();
-        }
-
-        valid
+        self.board.move_piece(start_position, end_position)
     }
 }
