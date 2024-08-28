@@ -3,7 +3,7 @@ pub mod fen;
 pub mod game;
 pub mod piece;
 
-use board::{position::Position, Board};
+use board::position::Position;
 use game::Game;
 
 pub fn run() {
@@ -26,14 +26,14 @@ pub fn perform_moves(game: &mut Game, moves: &Vec<(&str, &str)>) {
                 let result = game.attempt_move(&start, &end);
 
                 match result {
-                  Ok(_) => {
-                    println!("{}\n", game.board);
-                    println!("{}\n", fen::generate_fen(&game.board));
-                  },
-                  Err(error) => {
-                    println!("{error:?}");
-                    break;
-                  }
+                    Ok(_) => {
+                        println!("{}\n", game.board);
+                        println!("{}\n", fen::generate_fen(&game.board));
+                    }
+                    Err(error) => {
+                        println!("{error:?}");
+                        break;
+                    }
                 }
             }
             _ => break,
