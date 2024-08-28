@@ -1,6 +1,8 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use crate::board::position::{Offset, Position};
+
+use super::MoveType;
 
 pub fn get_if_valid<F>(position: &Position, offset: &Offset, filter: F) -> Option<Position>
 where
@@ -10,10 +12,10 @@ where
 }
 
 pub fn add_while_valid<F>(
-    start_position: &Position,
+    start: &Position,
     offset: &Offset,
     filter: F,
-    valid_positions: &mut HashSet<Position>,
+    valid_positions: &mut HashMap<Position, MoveType>,
 ) where
     F: Fn(&Position) -> bool,
 {
@@ -22,24 +24,24 @@ pub fn add_while_valid<F>(
         return;
     }
 
-    let mut current_position = start_position.clone();
+    let mut current_position = start.clone();
     loop {
         match get_if_valid(&current_position, &offset, &filter) {
             Some(new_position) => {
                 current_position = new_position.clone();
 
-                valid_positions.insert(new_position);
+                valid_positions.insert(new_position, MoveType::Move);
             }
             None => break,
         };
     }
 }
 
-pub fn positions_to_string(positions: &HashSet<Position>) -> String {
+pub fn positions_to_string(positions: &HashMap<Position, MoveType>) -> String {
     let mut output = String::new();
 
     let mut counter = 0;
-    for position in positions {
+    for (position, move_type) in positions {
         if counter > 0 {
             output += ", ";
         }
