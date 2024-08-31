@@ -5,7 +5,7 @@ pub mod utils;
 
 use std::collections::HashMap;
 
-use crate::piece::{Piece, PieceType, Side};
+use crate::piece::{Piece, PieceType, PromotionType, Side};
 use position::{Offset, Position};
 
 const BOARD_SIZE: usize = 64;
@@ -51,6 +51,31 @@ pub enum MoveKind {
     EnPassant(Position),  // capture position
     ShortCastle,
     LongCastle,
+    Promotion,
+}
+
+pub struct MoveRequest {
+    start: Position,
+    end: Position,
+    promotion: Option<PromotionType>,
+}
+
+impl MoveRequest {
+    pub fn new(start: Position, end: Position) -> MoveRequest {
+        MoveRequest {
+            start,
+            end,
+            promotion: None,
+        }
+    }
+
+    pub fn promotion(start: Position, end: Position, promotion_type: PromotionType) -> MoveRequest {
+        MoveRequest {
+            start,
+            end,
+            promotion: Some(promotion_type),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -196,27 +221,33 @@ impl Board {
         }
     }
 
-    fn get_move(&self, start: &Position, end: &Position) -> Result<MoveKind, MoveError> {
+    fn get_move(&self, request: &MoveRequest) -> Result<MoveKind, MoveError> {
         let piece = self
-            .get_piece(start)
+            .get_piece(&request.start)
             .filter(|piece| piece.side == self.current_turn)
             .ok_or(MoveError::new(
                 "Unable to find a piece for the current player at the provided position.",
             ))?;
 
-        let moves = self.get_moves(piece, start);
+        let moves = self.get_moves(piece, &request.start);
         let move_kind = moves
-            .get(end)
+            .get(&request.end)
             .ok_or(MoveError::new("Provided move is not valid."))?;
+
+        if *move_kind == MoveKind::Promotion && request.promotion == None {
+            return Err(MoveError::new(
+                "Invalid move request, missing promotion data.",
+            ));
+        }
 
         Ok(move_kind.clone())
     }
 
-    pub fn move_piece(&mut self, start: &Position, end: &Position) -> Result<(), MoveError> {
-        let move_kind = self.get_move(start, end)?;
+    pub fn move_piece(&mut self, request: MoveRequest) -> Result<(), MoveError> {
+        let move_kind = self.get_move(&request)?;
 
         // Always take the piece from the start square.
-        let moving_piece = self.take_piece(start).unwrap();
+        let moving_piece = self.take_piece(&request.start).unwrap();
 
         // Special handling for en passant because the position of the captured piece is not on the end position.
         // Note that this must happen before we update the en passant target.
@@ -234,16 +265,16 @@ impl Board {
         // Handle castling
         match (&moving_piece.piece_type, &moving_piece.side) {
             (PieceType::Rook, Side::White) => {
-                if start == &Position::a1() {
+                if request.start == Position::a1() {
                     self.castle_rights.white_long_castle_rights = false;
-                } else if start == &Position::h1() {
+                } else if request.start == Position::h1() {
                     self.castle_rights.white_short_castle_rights = false;
                 }
             }
             (PieceType::Rook, Side::Black) => {
-                if start == &Position::a8() {
+                if request.start == Position::a8() {
                     self.castle_rights.black_long_castle_rights = false;
-                } else if start == &Position::h8() {
+                } else if request.start == Position::h8() {
                     self.castle_rights.black_short_castle_rights = false;
                 }
             }
@@ -282,8 +313,16 @@ impl Board {
             _ => (),
         }
 
+        let piece = if move_kind == MoveKind::Promotion {
+            // We would not get the MoveKind promotion if it was an invalid request.
+            let promotion_piece_type = request.promotion.unwrap().to_piece_type();
+            Piece::new(promotion_piece_type, self.current_turn.clone())
+        } else {
+            moving_piece
+        };
+
         // Place the piece on it's destination square.
-        self.set_position(end, Some(moving_piece));
+        self.set_position(&request.end, Some(piece));
 
         self.change_turn();
 
@@ -304,28 +343,29 @@ impl Board {
     pub fn get_pawn_moves(&self, start: &Position, side: &Side) -> HashMap<Position, MoveKind> {
         let mut valid_positions = HashMap::new();
 
-        let forward_one = if *side == Side::White {
-            Offset::new(0, 1)
-        } else {
-            Offset::new(0, -1)
+        let forward_one = match side {
+            Side::White => Offset::new(0, 1),
+            Side::Black => Offset::new(0, -1),
         };
 
-        let forward_two = if *side == Side::White {
-            Offset::new(0, 2)
-        } else {
-            Offset::new(0, -2)
+        let forward_two = match side {
+            Side::White => Offset::new(0, 2),
+            Side::Black => Offset::new(0, -2),
         };
 
-        let left_diagonal = if *side == Side::White {
-            Offset::new(-1, 1)
-        } else {
-            Offset::new(1, -1)
+        let left_diagonal = match side {
+            Side::White => Offset::new(-1, 1),
+            Side::Black => Offset::new(1, -1),
         };
 
-        let right_diagonal = if *side == Side::White {
-            Offset::new(1, 1)
-        } else {
-            Offset::new(-1, -1)
+        let right_diagonal = match side {
+            Side::White => Offset::new(1, 1),
+            Side::Black => Offset::new(-1, -1),
+        };
+
+        let promotion_rank = match side {
+            Side::White => rank::EIGHT,
+            Side::Black => rank::ONE,
         };
 
         let forward_move = |new_position: &Position| !self.contains_piece(new_position);
@@ -333,7 +373,12 @@ impl Board {
         let en_passant_move = |new_position: &Position| self.is_en_passant_target(new_position);
 
         if let Some(new_position) = utils::get_if_valid(start, &forward_one, forward_move) {
-            valid_positions.insert(new_position, MoveKind::Move);
+            let move_kind = if new_position.rank() == promotion_rank {
+                MoveKind::Promotion
+            } else {
+                MoveKind::Move
+            };
+            valid_positions.insert(new_position, move_kind);
         }
 
         if let Some(new_position) = utils::get_if_valid(start, &forward_two, forward_move) {
@@ -342,7 +387,12 @@ impl Board {
         }
 
         if let Some(new_position) = utils::get_if_valid(start, &left_diagonal, capture_move) {
-            valid_positions.insert(new_position, MoveKind::Move);
+            let move_kind = if new_position.rank() == promotion_rank {
+                MoveKind::Promotion
+            } else {
+                MoveKind::Move
+            };
+            valid_positions.insert(new_position, move_kind);
         }
 
         if let Some(new_position) = utils::get_if_valid(start, &left_diagonal, en_passant_move) {
@@ -353,7 +403,12 @@ impl Board {
         }
 
         if let Some(new_position) = utils::get_if_valid(start, &right_diagonal, capture_move) {
-            valid_positions.insert(new_position, MoveKind::Move);
+            let move_kind = if new_position.rank() == promotion_rank {
+                MoveKind::Promotion
+            } else {
+                MoveKind::Move
+            };
+            valid_positions.insert(new_position, move_kind);
         }
 
         if let Some(new_position) = utils::get_if_valid(start, &right_diagonal, en_passant_move) {

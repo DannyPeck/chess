@@ -3,40 +3,35 @@ pub mod fen;
 pub mod game;
 pub mod piece;
 
-use board::position::Position;
+use board::{position::Position, MoveRequest};
 use game::Game;
+use piece::PromotionType;
 
 pub fn run() {
     let parsed_board =
-        fen::parse_fen("rnbqkbnr/pppp1ppp/4p3/8/8/4P3/PPPP1PPP/RNBQKBNR w KQkq - 0 2").unwrap();
+        fen::parse_fen("r2qkbnr/p1Pppppp/b1n5/1p6/8/8/P1PPPPPP/RNBQKBNR w KQkq - 1 5").unwrap();
     let mut parsed_game = Game::new(parsed_board);
 
-    println!("Parsed Game:\n{}\n", parsed_game.board);
-    println!("{:#?}\n", parsed_game.board.get_castle_rights());
+    let parsed_moves = vec![MoveRequest::promotion(
+        Position::c7(),
+        Position::c8(),
+        PromotionType::Knight,
+    )];
 
-    let parsed_moves = vec![("e1", "e2"), ("e8", "e7")];
-
-    perform_moves(&mut parsed_game, &parsed_moves);
+    perform_moves(&mut parsed_game, parsed_moves);
 }
 
-pub fn perform_moves(game: &mut Game, moves: &Vec<(&str, &str)>) {
-    for (start, end) in moves {
-        match (Position::from_str(start), &Position::from_str(end)) {
-            (Some(start), Some(end)) => {
-                let result = game.attempt_move(&start, &end);
-
-                match result {
-                    Ok(_) => {
-                        println!("{}\n", game.board);
-                        println!("{}\n", fen::generate_fen(&game.board));
-                    }
-                    Err(error) => {
-                        println!("{error:?}");
-                        break;
-                    }
-                }
+pub fn perform_moves(game: &mut Game, move_requests: Vec<MoveRequest>) {
+    for request in move_requests {
+        match game.attempt_move(request) {
+            Ok(_) => {
+                println!("{}\n", game.board);
+                println!("{}\n", fen::generate_fen(&game.board));
             }
-            _ => break,
+            Err(error) => {
+                println!("{error:?}");
+                break;
+            }
         }
     }
 }

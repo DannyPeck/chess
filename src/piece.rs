@@ -8,6 +8,25 @@ pub enum PieceType {
     King,
 }
 
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum PromotionType {
+    Knight,
+    Bishop,
+    Rook,
+    Queen,
+}
+
+impl PromotionType {
+    pub fn to_piece_type(&self) -> PieceType {
+        match self {
+            PromotionType::Knight => PieceType::Knight,
+            PromotionType::Bishop => PieceType::Bishop,
+            PromotionType::Rook => PieceType::Rook,
+            PromotionType::Queen => PieceType::Queen,
+        }
+    }
+}
+
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub enum Side {
     White = 0,

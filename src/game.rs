@@ -1,4 +1,4 @@
-use crate::board::{position::Position, Board, MoveError};
+use crate::board::{Board, MoveError, MoveRequest};
 
 pub struct Game {
     pub board: Board,
@@ -9,11 +9,7 @@ impl Game {
         Game { board }
     }
 
-    pub fn attempt_move(
-        &mut self,
-        start_position: &Position,
-        end_position: &Position,
-    ) -> Result<(), MoveError> {
-        self.board.move_piece(start_position, end_position)
+    pub fn attempt_move(&mut self, request: MoveRequest) -> Result<(), MoveError> {
+        self.board.move_piece(request)
     }
 }
