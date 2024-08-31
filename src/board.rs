@@ -9,44 +9,7 @@ use crate::piece::{Piece, PieceType, Side};
 use position::{Offset, Position};
 
 const BOARD_SIZE: usize = 64;
-const EMPTY: BoardPosition = BoardPosition { opt_piece: None };
-
-#[derive(Debug)]
-struct BoardPosition {
-    opt_piece: Option<Piece>,
-}
-
-impl BoardPosition {
-    pub fn new(opt_piece: Option<Piece>) -> BoardPosition {
-        BoardPosition { opt_piece }
-    }
-
-    pub fn from(piece: Piece) -> BoardPosition {
-        BoardPosition {
-            opt_piece: Some(piece),
-        }
-    }
-
-    pub fn empty() -> BoardPosition {
-        EMPTY
-    }
-
-    pub fn get_piece(&self) -> &Option<Piece> {
-        &self.opt_piece
-    }
-
-    pub fn set(&mut self, opt_piece: Option<Piece>) {
-        self.opt_piece = opt_piece;
-    }
-
-    pub fn take_piece(&mut self) -> Option<Piece> {
-        let opt_piece = self.opt_piece.clone();
-
-        self.opt_piece = None;
-
-        opt_piece
-    }
-}
+const EMPTY: Option<Piece> = None;
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct CastleRights {
@@ -82,7 +45,7 @@ impl MoveError {
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
-pub enum MoveType {
+pub enum MoveKind {
     Move,
     DoubleMove(Position), //  en passant target position
     EnPassant(Position),  // capture position
@@ -92,7 +55,7 @@ pub enum MoveType {
 
 #[derive(Debug)]
 pub struct Board {
-    positions: [BoardPosition; BOARD_SIZE],
+    positions: [Option<Piece>; BOARD_SIZE],
     current_turn: Side,
     castle_rights: CastleRights,
     en_passant_target: Option<Position>,
@@ -102,7 +65,7 @@ pub struct Board {
 
 impl Board {
     pub fn empty() -> Board {
-        let positions: [BoardPosition; BOARD_SIZE] = [EMPTY; BOARD_SIZE];
+        let positions: [Option<Piece>; BOARD_SIZE] = [EMPTY; BOARD_SIZE];
         Board {
             positions,
             current_turn: Side::White,
@@ -126,7 +89,7 @@ impl Board {
         half_moves: u32,
         full_moves: u32,
     ) -> Board {
-        let positions: [BoardPosition; BOARD_SIZE] = [EMPTY; BOARD_SIZE];
+        let positions: [Option<Piece>; BOARD_SIZE] = [EMPTY; BOARD_SIZE];
         let mut board = Board {
             positions,
             current_turn,
@@ -141,7 +104,413 @@ impl Board {
         board
     }
 
-    pub fn default() -> Board {
+    pub fn get_current_turn(&self) -> &Side {
+        &self.current_turn
+    }
+
+    fn change_turn(&mut self) {
+        self.current_turn = match self.current_turn {
+            Side::White => Side::Black,
+            Side::Black => {
+                // TODO: Update half moves once we have check detection.
+                self.full_moves += 1;
+                Side::White
+            }
+        };
+    }
+
+    pub fn get_castle_rights(&self) -> &CastleRights {
+        &self.castle_rights
+    }
+
+    pub fn get_en_passant_target(&self) -> &Option<Position> {
+        &self.en_passant_target
+    }
+
+    pub fn get_half_moves(&self) -> u32 {
+        self.half_moves
+    }
+
+    pub fn get_full_moves(&self) -> u32 {
+        self.full_moves
+    }
+
+    pub fn get_piece(&self, position: &Position) -> Option<&Piece> {
+        self.positions[position.value()].as_ref()
+    }
+
+    pub fn is_occupiable_position(&self, position: &Position, side: &Side) -> bool {
+        match self.get_piece(position) {
+            Some(piece) => piece.side != *side,
+            None => true,
+        }
+    }
+
+    pub fn contains_piece(&self, position: &Position) -> bool {
+        self.get_piece(position).is_some()
+    }
+
+    pub fn contains_enemy_piece(&self, position: &Position, side: &Side) -> bool {
+        match self.get_piece(position) {
+            Some(piece) => piece.side != *side,
+            None => false,
+        }
+    }
+
+    pub fn is_en_passant_target(&self, position: &Position) -> bool {
+        match &self.en_passant_target {
+            Some(en_passant_target) => position == en_passant_target,
+            None => false,
+        }
+    }
+
+    fn set_position(&mut self, position: &Position, opt_piece: Option<Piece>) {
+        self.positions[position.value()] = opt_piece;
+    }
+
+    pub fn add_piece(&mut self, piece: Piece, position: &Position) {
+        self.set_position(&position, Some(piece));
+    }
+
+    pub fn add_pieces(&mut self, pieces: Vec<(Piece, Position)>) {
+        for (piece, position) in pieces {
+            self.add_piece(piece, &position);
+        }
+    }
+
+    fn take_piece(&mut self, position: &Position) -> Option<Piece> {
+        self.positions[position.value()].take()
+    }
+
+    fn determine_en_passant_target(&self, start: &Position, side: &Side) -> Option<Position> {
+        match side {
+            Side::White => Position::from_offset(start, &Offset::new(0, 1)),
+            Side::Black => Position::from_offset(start, &Offset::new(0, -1)),
+        }
+    }
+
+    fn determine_en_passant_capture(&self, end: &Position, side: &Side) -> Option<Position> {
+        match side {
+            Side::White => Position::from_offset(end, &Offset::new(0, -1)),
+            Side::Black => Position::from_offset(end, &Offset::new(0, 1)),
+        }
+    }
+
+    fn get_move(&self, start: &Position, end: &Position) -> Result<MoveKind, MoveError> {
+        let piece = self
+            .get_piece(start)
+            .filter(|piece| piece.side == self.current_turn)
+            .ok_or(MoveError::new(
+                "Unable to find a piece for the current player at the provided position.",
+            ))?;
+
+        let moves = self.get_moves(piece, start);
+        let move_kind = moves
+            .get(end)
+            .ok_or(MoveError::new("Provided move is not valid."))?;
+
+        Ok(move_kind.clone())
+    }
+
+    pub fn move_piece(&mut self, start: &Position, end: &Position) -> Result<(), MoveError> {
+        let move_kind = self.get_move(start, end)?;
+
+        // Always take the piece from the start square.
+        let moving_piece = self.take_piece(start).unwrap();
+
+        // Special handling for en passant because the position of the captured piece is not on the end position.
+        // Note that this must happen before we update the en passant target.
+        if let MoveKind::EnPassant(en_passant_capture) = &move_kind {
+            self.set_position(&en_passant_capture, None);
+        }
+
+        // Set the en passant target
+        if let MoveKind::DoubleMove(en_passant_target) = &move_kind {
+            self.en_passant_target = Some(en_passant_target.clone());
+        } else {
+            self.en_passant_target = None;
+        }
+
+        // Handle castling
+        match (&moving_piece.piece_type, &moving_piece.side) {
+            (PieceType::Rook, Side::White) => {
+                if start == &Position::a1() {
+                    self.castle_rights.white_long_castle_rights = false;
+                } else if start == &Position::h1() {
+                    self.castle_rights.white_short_castle_rights = false;
+                }
+            }
+            (PieceType::Rook, Side::Black) => {
+                if start == &Position::a8() {
+                    self.castle_rights.black_long_castle_rights = false;
+                } else if start == &Position::h8() {
+                    self.castle_rights.black_short_castle_rights = false;
+                }
+            }
+            (PieceType::King, Side::White) => {
+                self.castle_rights.white_long_castle_rights = false;
+                self.castle_rights.white_short_castle_rights = false;
+
+                match &move_kind {
+                    MoveKind::ShortCastle => {
+                        let rook = self.take_piece(&Position::h1()).unwrap();
+                        self.set_position(&Position::f1(), Some(rook));
+                    }
+                    MoveKind::LongCastle => {
+                        let rook = self.take_piece(&Position::a1()).unwrap();
+                        self.set_position(&Position::d1(), Some(rook));
+                    }
+                    _ => (),
+                }
+            }
+            (PieceType::King, Side::Black) => {
+                self.castle_rights.black_long_castle_rights = false;
+                self.castle_rights.black_short_castle_rights = false;
+
+                match &move_kind {
+                    MoveKind::ShortCastle => {
+                        let rook = self.take_piece(&Position::h8()).unwrap();
+                        self.set_position(&Position::f8(), Some(rook));
+                    }
+                    MoveKind::LongCastle => {
+                        let rook = self.take_piece(&Position::a8()).unwrap();
+                        self.set_position(&Position::d8(), Some(rook));
+                    }
+                    _ => (),
+                }
+            }
+            _ => (),
+        }
+
+        // Place the piece on it's destination square.
+        self.set_position(end, Some(moving_piece));
+
+        self.change_turn();
+
+        Ok(())
+    }
+
+    pub fn get_moves(&self, piece: &Piece, start: &Position) -> HashMap<Position, MoveKind> {
+        match piece.piece_type {
+            PieceType::Pawn => self.get_pawn_moves(start, &piece.side),
+            PieceType::Rook => self.get_rook_moves(start, &piece.side),
+            PieceType::Knight => self.get_knight_moves(start, &piece.side),
+            PieceType::Bishop => self.get_bishop_moves(start, &piece.side),
+            PieceType::King => self.get_king_moves(start, &piece.side),
+            PieceType::Queen => self.get_queen_moves(start, &piece.side),
+        }
+    }
+
+    pub fn get_pawn_moves(&self, start: &Position, side: &Side) -> HashMap<Position, MoveKind> {
+        let mut valid_positions = HashMap::new();
+
+        let forward_one = if *side == Side::White {
+            Offset::new(0, 1)
+        } else {
+            Offset::new(0, -1)
+        };
+
+        let forward_two = if *side == Side::White {
+            Offset::new(0, 2)
+        } else {
+            Offset::new(0, -2)
+        };
+
+        let left_diagonal = if *side == Side::White {
+            Offset::new(-1, 1)
+        } else {
+            Offset::new(1, -1)
+        };
+
+        let right_diagonal = if *side == Side::White {
+            Offset::new(1, 1)
+        } else {
+            Offset::new(-1, -1)
+        };
+
+        let forward_move = |new_position: &Position| !self.contains_piece(new_position);
+        let capture_move = |new_position: &Position| self.contains_enemy_piece(new_position, side);
+        let en_passant_move = |new_position: &Position| self.is_en_passant_target(new_position);
+
+        if let Some(new_position) = utils::get_if_valid(start, &forward_one, forward_move) {
+            valid_positions.insert(new_position, MoveKind::Move);
+        }
+
+        if let Some(new_position) = utils::get_if_valid(start, &forward_two, forward_move) {
+            let en_passant_target = self.determine_en_passant_target(start, side).unwrap();
+            valid_positions.insert(new_position, MoveKind::DoubleMove(en_passant_target));
+        }
+
+        if let Some(new_position) = utils::get_if_valid(start, &left_diagonal, capture_move) {
+            valid_positions.insert(new_position, MoveKind::Move);
+        }
+
+        if let Some(new_position) = utils::get_if_valid(start, &left_diagonal, en_passant_move) {
+            let en_passant_capture = self
+                .determine_en_passant_capture(&new_position, side)
+                .unwrap();
+            valid_positions.insert(new_position, MoveKind::EnPassant(en_passant_capture));
+        }
+
+        if let Some(new_position) = utils::get_if_valid(start, &right_diagonal, capture_move) {
+            valid_positions.insert(new_position, MoveKind::Move);
+        }
+
+        if let Some(new_position) = utils::get_if_valid(start, &right_diagonal, en_passant_move) {
+            let en_passant_capture = self
+                .determine_en_passant_capture(&new_position, side)
+                .unwrap();
+            valid_positions.insert(new_position, MoveKind::EnPassant(en_passant_capture));
+        }
+
+        return valid_positions;
+    }
+
+    pub fn get_rook_moves(&self, start: &Position, side: &Side) -> HashMap<Position, MoveKind> {
+        self.get_linear_moves(start, side)
+    }
+
+    pub fn get_knight_moves(&self, start: &Position, side: &Side) -> HashMap<Position, MoveKind> {
+        let mut valid_positions = HashMap::new();
+
+        let filter = |new_position: &Position| self.is_occupiable_position(new_position, side);
+
+        let offsets = vec![
+            // North East
+            Offset::new(1, 2),
+            Offset::new(2, 1),
+            // South East
+            Offset::new(1, -2),
+            Offset::new(2, -1),
+            // North West
+            Offset::new(-1, 2),
+            Offset::new(-2, 1),
+            // South West
+            Offset::new(-2, -1),
+            Offset::new(-1, -2),
+        ];
+
+        for offset in offsets {
+            if let Some(new_position) = utils::get_if_valid(&start, &offset, filter) {
+                valid_positions.insert(new_position, MoveKind::Move);
+            }
+        }
+
+        return valid_positions;
+    }
+
+    pub fn get_bishop_moves(&self, start: &Position, side: &Side) -> HashMap<Position, MoveKind> {
+        self.get_diagonal_moves(start, side)
+    }
+
+    pub fn get_queen_moves(&self, start: &Position, side: &Side) -> HashMap<Position, MoveKind> {
+        let mut moves = self.get_linear_moves(start, side);
+
+        let diagonal_moves = self.get_diagonal_moves(start, side);
+        moves.extend(diagonal_moves);
+
+        moves
+    }
+
+    pub fn get_king_moves(&self, start: &Position, side: &Side) -> HashMap<Position, MoveKind> {
+        let mut valid_positions = HashMap::new();
+
+        let filter = |new_position: &Position| self.is_occupiable_position(new_position, side);
+
+        // Regular moves
+        let offsets = vec![
+            Offset::new(1, 0),
+            Offset::new(0, 1),
+            Offset::new(-1, 0),
+            Offset::new(0, -1),
+            Offset::new(1, 1),
+            Offset::new(-1, 1),
+            Offset::new(1, -1),
+            Offset::new(-1, -1),
+        ];
+
+        for offset in offsets {
+            if let Some(new_position) = utils::get_if_valid(&start, &offset, filter) {
+                valid_positions.insert(new_position, MoveKind::Move);
+            }
+        }
+
+        // Castling
+        match self.current_turn {
+            Side::White => {
+                if self.castle_rights.white_short_castle_rights {
+                    valid_positions.insert(Position::g1(), MoveKind::ShortCastle);
+                }
+
+                if self.castle_rights.white_long_castle_rights {
+                    valid_positions.insert(Position::c1(), MoveKind::LongCastle);
+                }
+            }
+            Side::Black => {
+                if self.castle_rights.black_short_castle_rights {
+                    valid_positions.insert(Position::g8(), MoveKind::ShortCastle);
+                }
+
+                if self.castle_rights.black_long_castle_rights {
+                    valid_positions.insert(Position::c8(), MoveKind::LongCastle);
+                }
+            }
+        }
+
+        return valid_positions;
+    }
+
+    pub fn get_diagonal_moves(
+        &self,
+        position: &Position,
+        side: &Side,
+    ) -> HashMap<Position, MoveKind> {
+        let mut valid_positions = HashMap::new();
+
+        let filter = |new_position: &Position| self.is_occupiable_position(new_position, side);
+
+        // Right & Up
+        utils::add_while_valid(position, &Offset::new(1, 1), filter, &mut valid_positions);
+
+        // Left & Up
+        utils::add_while_valid(position, &Offset::new(-1, 1), filter, &mut valid_positions);
+
+        // Right & Down
+        utils::add_while_valid(position, &Offset::new(1, -1), filter, &mut valid_positions);
+
+        // Left & Down
+        utils::add_while_valid(position, &Offset::new(-1, -1), filter, &mut valid_positions);
+
+        valid_positions
+    }
+
+    pub fn get_linear_moves(
+        &self,
+        position: &Position,
+        side: &Side,
+    ) -> HashMap<Position, MoveKind> {
+        let mut valid_positions = HashMap::new();
+
+        let filter = |new_position: &Position| self.is_occupiable_position(new_position, side);
+
+        // Up
+        utils::add_while_valid(position, &Offset::new(0, 1), filter, &mut valid_positions);
+
+        // Down
+        utils::add_while_valid(position, &Offset::new(0, -1), filter, &mut valid_positions);
+
+        // Right
+        utils::add_while_valid(position, &Offset::new(1, 0), filter, &mut valid_positions);
+
+        // Left
+        utils::add_while_valid(position, &Offset::new(-1, 0), filter, &mut valid_positions);
+
+        valid_positions
+    }
+}
+
+impl Default for Board {
+    fn default() -> Self {
         let mut pieces = Vec::new();
 
         // White piece
@@ -186,417 +555,6 @@ impl Board {
 
         board
     }
-
-    pub fn get_current_turn(&self) -> Side {
-        self.current_turn.clone()
-    }
-
-    fn change_turn(&mut self) {
-        self.current_turn = match self.current_turn {
-            Side::White => Side::Black,
-            Side::Black => {
-                // TODO: Update half moves once we have check detection.
-                self.full_moves += 1;
-                Side::White
-            }
-        };
-    }
-
-    pub fn get_castle_rights(&self) -> &CastleRights {
-        &self.castle_rights
-    }
-
-    pub fn get_en_passant_target(&self) -> &Option<Position> {
-        &self.en_passant_target
-    }
-
-    pub fn get_half_moves(&self) -> u32 {
-        self.half_moves
-    }
-
-    pub fn get_full_moves(&self) -> u32 {
-        self.full_moves
-    }
-
-    fn get_board_position(&self, position: &Position) -> &BoardPosition {
-        &self.positions[position.value()]
-    }
-
-    pub fn get_piece(&self, position: &Position) -> &Option<Piece> {
-        &self.get_board_position(position).opt_piece
-    }
-
-    pub fn is_occupiable_position(&self, position: &Position, side: &Side) -> bool {
-        match self.get_piece(position) {
-            Some(piece) => piece.side != *side,
-            None => true,
-        }
-    }
-
-    pub fn contains_piece(&self, position: &Position) -> bool {
-        self.get_piece(position).is_some()
-    }
-
-    pub fn contains_enemy_piece(&self, position: &Position, side: &Side) -> bool {
-        match self.get_piece(position) {
-            Some(piece) => piece.side != *side,
-            None => false,
-        }
-    }
-
-    pub fn is_en_passant_target(&self, position: &Position) -> bool {
-        match &self.en_passant_target {
-            Some(en_passant_target) => position == en_passant_target,
-            None => false,
-        }
-    }
-
-    fn set_position(&mut self, position: &Position, opt_piece: Option<Piece>) {
-        let board_position = &mut self.positions[position.value()];
-        board_position.set(opt_piece);
-    }
-
-    pub fn add_piece(&mut self, piece: Piece, position: &Position) {
-        self.set_position(&position, Some(piece));
-    }
-
-    pub fn add_pieces(&mut self, pieces: Vec<(Piece, Position)>) {
-        for (piece, position) in pieces {
-            self.add_piece(piece, &position);
-        }
-    }
-
-    fn take_piece(&mut self, position: &Position) -> Option<Piece> {
-        self.positions[position.value()].take_piece()
-    }
-
-    fn determine_en_passant_target(&self, start: &Position, side: &Side) -> Option<Position> {
-        match side {
-            Side::White => Position::from_offset(start, &Offset::new(0, 1)),
-            Side::Black => Position::from_offset(start, &Offset::new(0, -1)),
-        }
-    }
-
-    fn determine_en_passant_capture(&self, end: &Position, side: &Side) -> Option<Position> {
-        match side {
-            Side::White => Position::from_offset(end, &Offset::new(0, -1)),
-            Side::Black => Position::from_offset(end, &Offset::new(0, 1)),
-        }
-    }
-
-    fn get_move(&self, start: &Position, end: &Position) -> Result<MoveType, MoveError> {
-        let piece = self
-            .get_board_position(start)
-            .get_piece()
-            .as_ref()
-            .filter(|piece| piece.side == self.current_turn)
-            .ok_or(MoveError::new(
-                "Unable to find a piece for the current player at the provided position.",
-            ))?;
-
-        let moves = self.get_moves(piece, start);
-        let move_type = moves
-            .get(end)
-            .ok_or(MoveError::new("Provided move is not valid."))?;
-
-        Ok(move_type.clone())
-    }
-
-    pub fn move_piece(&mut self, start: &Position, end: &Position) -> Result<(), MoveError> {
-        let move_type = self.get_move(start, end)?;
-
-        // Always take the piece from the start square.
-        let moving_piece = self.take_piece(start).unwrap();
-
-        // Special handling for en passant because the position of the captured piece is not on the end position.
-        // Note that this must happen before we update the en passant target.
-        if let MoveType::EnPassant(en_passant_capture) = &move_type {
-            self.set_position(&en_passant_capture, None);
-        }
-
-        // Set the en passant target
-        if let MoveType::DoubleMove(en_passant_target) = &move_type {
-            self.en_passant_target = Some(en_passant_target.clone());
-        } else {
-            self.en_passant_target = None;
-        }
-
-        // Handle castling
-        match (&moving_piece.piece_type, &moving_piece.side) {
-            (PieceType::Rook, Side::White) => {
-                if start == &Position::a1() {
-                    self.castle_rights.white_long_castle_rights = false;
-                } else if start == &Position::h1() {
-                    self.castle_rights.white_short_castle_rights = false;
-                }
-            }
-            (PieceType::Rook, Side::Black) => {
-                if start == &Position::a8() {
-                    self.castle_rights.black_long_castle_rights = false;
-                } else if start == &Position::h8() {
-                    self.castle_rights.black_short_castle_rights = false;
-                }
-            }
-            (PieceType::King, Side::White) => {
-                self.castle_rights.white_long_castle_rights = false;
-                self.castle_rights.white_short_castle_rights = false;
-
-                match &move_type {
-                    MoveType::ShortCastle => {
-                        let rook = self.take_piece(&Position::h1()).unwrap();
-                        self.set_position(&Position::f1(), Some(rook));
-                    }
-                    MoveType::LongCastle => {
-                        let rook = self.take_piece(&Position::a1()).unwrap();
-                        self.set_position(&Position::d1(), Some(rook));
-                    }
-                    _ => (),
-                }
-            }
-            (PieceType::King, Side::Black) => {
-                self.castle_rights.black_long_castle_rights = false;
-                self.castle_rights.black_short_castle_rights = false;
-
-                match &move_type {
-                    MoveType::ShortCastle => {
-                        let rook = self.take_piece(&Position::h8()).unwrap();
-                        self.set_position(&Position::f8(), Some(rook));
-                    }
-                    MoveType::LongCastle => {
-                        let rook = self.take_piece(&Position::a8()).unwrap();
-                        self.set_position(&Position::d8(), Some(rook));
-                    }
-                    _ => (),
-                }
-            }
-            _ => (),
-        }
-
-        // Place the piece on it's destination square.
-        self.set_position(end, Some(moving_piece));
-
-        self.change_turn();
-
-        Ok(())
-    }
-
-    pub fn get_moves(&self, piece: &Piece, start: &Position) -> HashMap<Position, MoveType> {
-        match piece.piece_type {
-            PieceType::Pawn => self.get_pawn_moves(start, &piece.side),
-            PieceType::Rook => self.get_rook_moves(start, &piece.side),
-            PieceType::Knight => self.get_knight_moves(start, &piece.side),
-            PieceType::Bishop => self.get_bishop_moves(start, &piece.side),
-            PieceType::King => self.get_king_moves(start, &piece.side),
-            PieceType::Queen => self.get_queen_moves(start, &piece.side),
-        }
-    }
-
-    pub fn get_pawn_moves(&self, start: &Position, side: &Side) -> HashMap<Position, MoveType> {
-        let mut valid_positions = HashMap::new();
-
-        let forward_one = if *side == Side::White {
-            Offset::new(0, 1)
-        } else {
-            Offset::new(0, -1)
-        };
-
-        let forward_two = if *side == Side::White {
-            Offset::new(0, 2)
-        } else {
-            Offset::new(0, -2)
-        };
-
-        let left_diagonal = if *side == Side::White {
-            Offset::new(-1, 1)
-        } else {
-            Offset::new(1, -1)
-        };
-
-        let right_diagonal = if *side == Side::White {
-            Offset::new(1, 1)
-        } else {
-            Offset::new(-1, -1)
-        };
-
-        let forward_move = |new_position: &Position| !self.contains_piece(new_position);
-        let capture_move = |new_position: &Position| self.contains_enemy_piece(new_position, side);
-        let en_passant_move = |new_position: &Position| self.is_en_passant_target(new_position);
-
-        if let Some(new_position) = utils::get_if_valid(start, &forward_one, forward_move) {
-            valid_positions.insert(new_position, MoveType::Move);
-        }
-
-        if let Some(new_position) = utils::get_if_valid(start, &forward_two, forward_move) {
-            let en_passant_target = self.determine_en_passant_target(start, side).unwrap();
-            valid_positions.insert(new_position, MoveType::DoubleMove(en_passant_target));
-        }
-
-        if let Some(new_position) = utils::get_if_valid(start, &left_diagonal, capture_move) {
-            valid_positions.insert(new_position, MoveType::Move);
-        }
-
-        if let Some(new_position) = utils::get_if_valid(start, &left_diagonal, en_passant_move) {
-            let en_passant_capture = self
-                .determine_en_passant_capture(&new_position, side)
-                .unwrap();
-            valid_positions.insert(new_position, MoveType::EnPassant(en_passant_capture));
-        }
-
-        if let Some(new_position) = utils::get_if_valid(start, &right_diagonal, capture_move) {
-            valid_positions.insert(new_position, MoveType::Move);
-        }
-
-        if let Some(new_position) = utils::get_if_valid(start, &right_diagonal, en_passant_move) {
-            let en_passant_capture = self
-                .determine_en_passant_capture(&new_position, side)
-                .unwrap();
-            valid_positions.insert(new_position, MoveType::EnPassant(en_passant_capture));
-        }
-
-        return valid_positions;
-    }
-
-    pub fn get_rook_moves(&self, start: &Position, side: &Side) -> HashMap<Position, MoveType> {
-        self.get_linear_moves(start, side)
-    }
-
-    pub fn get_knight_moves(&self, start: &Position, side: &Side) -> HashMap<Position, MoveType> {
-        let mut valid_positions = HashMap::new();
-
-        let filter = |new_position: &Position| self.is_occupiable_position(new_position, side);
-
-        let offsets = vec![
-            // North East
-            Offset::new(1, 2),
-            Offset::new(2, 1),
-            // South East
-            Offset::new(1, -2),
-            Offset::new(2, -1),
-            // North West
-            Offset::new(-1, 2),
-            Offset::new(-2, 1),
-            // South West
-            Offset::new(-2, -1),
-            Offset::new(-1, -2),
-        ];
-
-        for offset in offsets {
-            if let Some(new_position) = utils::get_if_valid(&start, &offset, filter) {
-                valid_positions.insert(new_position, MoveType::Move);
-            }
-        }
-
-        return valid_positions;
-    }
-
-    pub fn get_bishop_moves(&self, start: &Position, side: &Side) -> HashMap<Position, MoveType> {
-        self.get_diagonal_moves(start, side)
-    }
-
-    pub fn get_queen_moves(&self, start: &Position, side: &Side) -> HashMap<Position, MoveType> {
-        let mut moves = self.get_linear_moves(start, side);
-
-        let diagonal_moves = self.get_diagonal_moves(start, side);
-        moves.extend(diagonal_moves);
-
-        moves
-    }
-
-    pub fn get_king_moves(&self, start: &Position, side: &Side) -> HashMap<Position, MoveType> {
-        let mut valid_positions = HashMap::new();
-
-        let filter = |new_position: &Position| self.is_occupiable_position(new_position, side);
-
-        // Regular moves
-        let offsets = vec![
-            Offset::new(1, 0),
-            Offset::new(0, 1),
-            Offset::new(-1, 0),
-            Offset::new(0, -1),
-            Offset::new(1, 1),
-            Offset::new(-1, 1),
-            Offset::new(1, -1),
-            Offset::new(-1, -1),
-        ];
-
-        for offset in offsets {
-            if let Some(new_position) = utils::get_if_valid(&start, &offset, filter) {
-                valid_positions.insert(new_position, MoveType::Move);
-            }
-        }
-
-        // Castling
-        match self.current_turn {
-            Side::White => {
-                if self.castle_rights.white_short_castle_rights {
-                    valid_positions.insert(Position::g1(), MoveType::ShortCastle);
-                }
-
-                if self.castle_rights.white_long_castle_rights {
-                    valid_positions.insert(Position::c1(), MoveType::LongCastle);
-                }
-            }
-            Side::Black => {
-                if self.castle_rights.black_short_castle_rights {
-                    valid_positions.insert(Position::g8(), MoveType::ShortCastle);
-                }
-
-                if self.castle_rights.black_long_castle_rights {
-                    valid_positions.insert(Position::c8(), MoveType::LongCastle);
-                }
-            }
-        }
-
-        return valid_positions;
-    }
-
-    pub fn get_diagonal_moves(
-        &self,
-        position: &Position,
-        side: &Side,
-    ) -> HashMap<Position, MoveType> {
-        let mut valid_positions = HashMap::new();
-
-        let filter = |new_position: &Position| self.is_occupiable_position(new_position, side);
-
-        // Right & Up
-        utils::add_while_valid(position, &Offset::new(1, 1), filter, &mut valid_positions);
-
-        // Left & Up
-        utils::add_while_valid(position, &Offset::new(-1, 1), filter, &mut valid_positions);
-
-        // Right & Down
-        utils::add_while_valid(position, &Offset::new(1, -1), filter, &mut valid_positions);
-
-        // Left & Down
-        utils::add_while_valid(position, &Offset::new(-1, -1), filter, &mut valid_positions);
-
-        valid_positions
-    }
-
-    pub fn get_linear_moves(
-        &self,
-        position: &Position,
-        side: &Side,
-    ) -> HashMap<Position, MoveType> {
-        let mut valid_positions = HashMap::new();
-
-        let filter = |new_position: &Position| self.is_occupiable_position(new_position, side);
-
-        // Up
-        utils::add_while_valid(position, &Offset::new(0, 1), filter, &mut valid_positions);
-
-        // Down
-        utils::add_while_valid(position, &Offset::new(0, -1), filter, &mut valid_positions);
-
-        // Right
-        utils::add_while_valid(position, &Offset::new(1, 0), filter, &mut valid_positions);
-
-        // Left
-        utils::add_while_valid(position, &Offset::new(-1, 0), filter, &mut valid_positions);
-
-        valid_positions
-    }
 }
 
 impl std::fmt::Display for Board {
@@ -606,7 +564,7 @@ impl std::fmt::Display for Board {
             let mut rank_string = String::new();
             for file in file::A..=file::H {
                 let position = Position::from_file_and_rank(file, rank);
-                let piece_notation = match self.positions[position.value()].get_piece() {
+                let piece_notation = match self.get_piece(&position) {
                     Some(piece) => piece.to_string(),
                     None => String::from(" "),
                 };
