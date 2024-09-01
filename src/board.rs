@@ -210,20 +210,6 @@ impl Board {
         self.positions[position.value()].take()
     }
 
-    fn determine_en_passant_target(&self, start: &Position, side: &Side) -> Option<Position> {
-        match side {
-            Side::White => Position::from_offset(start, &Offset::new(0, 1)),
-            Side::Black => Position::from_offset(start, &Offset::new(0, -1)),
-        }
-    }
-
-    fn determine_en_passant_capture(&self, end: &Position, side: &Side) -> Option<Position> {
-        match side {
-            Side::White => Position::from_offset(end, &Offset::new(0, -1)),
-            Side::Black => Position::from_offset(end, &Offset::new(0, 1)),
-        }
-    }
-
     fn get_move(&self, request: &MoveRequest) -> Result<MoveKind, MoveError> {
         let piece = self
             .get_piece(&request.start)
@@ -352,11 +338,6 @@ impl Board {
             Side::Black => Offset::new(0, -1),
         };
 
-        let forward_two = match side {
-            Side::White => Offset::new(0, 2),
-            Side::Black => Offset::new(0, -2),
-        };
-
         let left_diagonal = match side {
             Side::White => Offset::new(-1, 1),
             Side::Black => Offset::new(1, -1),
@@ -372,54 +353,71 @@ impl Board {
             Side::Black => rank::ONE,
         };
 
-        let forward_move = |new_position: &Position| !self.contains_piece(new_position);
-        let capture_move = |new_position: &Position| self.contains_enemy_piece(new_position, side);
-        let en_passant_move = |new_position: &Position| self.is_en_passant_target(new_position);
+        if let Some(new_position) = Position::from_offset(&start, &forward_one) {
+            if !self.contains_piece(&new_position) {
+                let move_kind = if new_position.rank() == promotion_rank {
+                    MoveKind::Promotion
+                } else {
+                    MoveKind::Move
+                };
+                valid_positions.insert(new_position, move_kind);
+            }
+        }
 
-        if let Some(new_position) = utils::get_if_valid(start, &forward_one, forward_move) {
-            let move_kind = if new_position.rank() == promotion_rank {
-                MoveKind::Promotion
-            } else {
-                MoveKind::Move
+        let double_move_positions = match side {
+            Side::White if start.rank() == rank::TWO => {
+                let forward_one = Position::from_file_and_rank(start.file(), start.rank() + 1);
+                let forward_two = Position::from_file_and_rank(start.file(), start.rank() + 2);
+                Some((forward_one, forward_two))
+            }
+            Side::Black if start.rank() == rank::SEVEN => {
+                let forward_one = Position::from_file_and_rank(start.file(), start.rank() - 1);
+                let forward_two = Position::from_file_and_rank(start.file(), start.rank() - 2);
+                Some((forward_one, forward_two))
+            }
+            _ => None,
+        };
+
+        if let Some((forward_one, forward_two)) = double_move_positions {
+            let forward_one_empty = !self.contains_piece(&forward_one);
+            let forward_two_empty = !self.contains_piece(&forward_two);
+
+            if forward_one_empty && forward_two_empty {
+                valid_positions.insert(forward_two, MoveKind::DoubleMove(forward_one));
+            }
+        }
+
+        let en_passant_move = |new_position: &Position| {
+            let en_passant_target = match side {
+                Side::White => {
+                    Position::from_file_and_rank(new_position.file(), new_position.rank() - 1)
+                }
+                Side::Black => {
+                    Position::from_file_and_rank(new_position.file(), new_position.rank() + 1)
+                }
             };
-            valid_positions.insert(new_position, move_kind);
-        }
-
-        if let Some(new_position) = utils::get_if_valid(start, &forward_two, forward_move) {
-            let en_passant_target = self.determine_en_passant_target(start, side).unwrap();
-            valid_positions.insert(new_position, MoveKind::DoubleMove(en_passant_target));
-        }
-
-        if let Some(new_position) = utils::get_if_valid(start, &left_diagonal, capture_move) {
-            let move_kind = if new_position.rank() == promotion_rank {
-                MoveKind::Promotion
+            
+            if self.is_en_passant_target(&en_passant_target) {
+                Some(en_passant_target)
             } else {
-                MoveKind::Move
-            };
-            valid_positions.insert(new_position, move_kind);
-        }
+                None
+            }
+        };
 
-        if let Some(new_position) = utils::get_if_valid(start, &left_diagonal, en_passant_move) {
-            let en_passant_capture = self
-                .determine_en_passant_capture(&new_position, side)
-                .unwrap();
-            valid_positions.insert(new_position, MoveKind::EnPassant(en_passant_capture));
-        }
-
-        if let Some(new_position) = utils::get_if_valid(start, &right_diagonal, capture_move) {
-            let move_kind = if new_position.rank() == promotion_rank {
-                MoveKind::Promotion
-            } else {
-                MoveKind::Move
-            };
-            valid_positions.insert(new_position, move_kind);
-        }
-
-        if let Some(new_position) = utils::get_if_valid(start, &right_diagonal, en_passant_move) {
-            let en_passant_capture = self
-                .determine_en_passant_capture(&new_position, side)
-                .unwrap();
-            valid_positions.insert(new_position, MoveKind::EnPassant(en_passant_capture));
+        let diagonal_moves = vec![left_diagonal, right_diagonal];
+        for diagonal_move in diagonal_moves {
+            if let Some(new_position) = Position::from_offset(&start, &diagonal_move) {
+                if self.contains_enemy_piece(&new_position, side) {
+                    let move_kind = if new_position.rank() == promotion_rank {
+                        MoveKind::Promotion
+                    } else {
+                        MoveKind::Move
+                    };
+                    valid_positions.insert(new_position, move_kind);
+                } else if let Some(en_passant_capture) = en_passant_move(&new_position) {
+                    valid_positions.insert(new_position, MoveKind::EnPassant(en_passant_capture));
+                }
+            }
         }
 
         return valid_positions;
@@ -642,7 +640,10 @@ impl std::fmt::Display for Board {
 
 #[cfg(test)]
 mod tests {
-    use crate::{board_position, fen};
+    use crate::{
+        board_position,
+        fen::{self, ParseError},
+    };
 
     use super::*;
 
@@ -822,5 +823,201 @@ mod tests {
         assert_eq!(board.get_half_moves(), 0);
 
         assert_eq!(board.get_full_moves(), 1);
+    }
+
+    #[test]
+    fn get_pawn_moves_white() -> Result<(), ParseError> {
+        // White starting line
+        {
+            let board = Board::default();
+            let moves = board.get_pawn_moves(&Position::f2(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::f3(), MoveKind::Move),
+                (Position::f4(), MoveKind::DoubleMove(Position::f3())),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White single move
+        {
+            let board = fen::parse_fen("rnbqkbnr/ppp1pppp/3p4/8/8/3P4/PPP1PPPP/RNBQKBNR w KQkq - 0 2")?;
+            let moves = board.get_pawn_moves(&Position::d3(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d4(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White right diagonal captures
+        {
+            let board = fen::parse_fen("rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2")?;
+            let moves = board.get_pawn_moves(&Position::d4(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d5(), MoveKind::Move),
+                (Position::e5(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White left diagonal captures
+        {
+            let board = fen::parse_fen("rnbqkbnr/pp1ppppp/8/2p5/3P4/8/PPP1PPPP/RNBQKBNR w KQkq c6 0 2")?;
+            let moves = board.get_pawn_moves(&Position::d4(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d5(), MoveKind::Move),
+                (Position::c5(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White can't move
+        {
+            let board = fen::parse_fen("rnbqkbnr/pp1ppppp/8/3P4/8/P1p5/1PP1PPPP/RNBQKBNR w KQkq - 0 4")?;
+            let moves = board.get_pawn_moves(&Position::c2(), &Side::White);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White en passant left
+        {
+            let board = fen::parse_fen("rnbqkbnr/1p1ppppp/3P4/p1p5/8/8/PPP1PPPP/RNBQKBNR w KQkq c6 0 4")?;
+            let moves = board.get_pawn_moves(&Position::d6(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::c7(), MoveKind::EnPassant(Position::c6())),
+                (Position::e7(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White en passant right
+        {
+            let board = fen::parse_fen("rnbqkbnr/pppp1pp1/3P4/4p2p/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 4")?;
+            let moves = board.get_pawn_moves(&Position::d6(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::e7(), MoveKind::EnPassant(Position::e6())),
+                (Position::c7(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White promotion
+        {
+            let board = fen::parse_fen("rn1qkbnr/ppP1ppp1/3p3p/5b2/8/8/P1PPPPPP/RNBQKBNR w KQkq - 0 5")?;
+            let moves = board.get_pawn_moves(&Position::c7(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::b8(), MoveKind::Promotion),
+                (Position::c8(), MoveKind::Promotion),
+                (Position::d8(), MoveKind::Promotion),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_pawn_moves_black() -> Result<(), ParseError> {
+        // Black starting line
+        {
+            let board = Board::default();
+            let moves = board.get_pawn_moves(&Position::f7(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::f6(), MoveKind::Move),
+                (Position::f5(), MoveKind::DoubleMove(Position::f6())),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black single move
+        {
+            let board = fen::parse_fen("rnbqkbnr/ppp1pppp/3p4/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 2")?;
+            let moves = board.get_pawn_moves(&Position::d6(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d5(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black right diagonal captures
+        {
+            let board = fen::parse_fen("rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2")?;
+            let moves = board.get_pawn_moves(&Position::e5(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::e4(), MoveKind::Move),
+                (Position::d4(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black left diagonal captures
+        {
+            let board = fen::parse_fen("rnbqkbnr/pp1ppppp/8/2p5/3P4/8/PPP1PPPP/RNBQKBNR w KQkq c6 0 2")?;
+            let moves = board.get_pawn_moves(&Position::c5(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d4(), MoveKind::Move),
+                (Position::c4(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black can't move
+        {
+            let board = fen::parse_fen("rnbqkbnr/pp1ppppp/3P4/8/2p5/8/PPP1PPPP/RNBQKBNR b KQkq - 0 3")?;
+            let moves = board.get_pawn_moves(&Position::d7(), &Side::Black);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black en passant left
+        {
+            let board = fen::parse_fen("rnbqkbnr/ppp1pppp/7P/8/4P3/3p4/PPPP1PP1/RNBQKBNR b KQkq e3 0 4")?;
+            let moves = board.get_pawn_moves(&Position::d3(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::e2(), MoveKind::EnPassant(Position::e3())),
+                (Position::c2(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black en passant right
+        {
+            let board = fen::parse_fen("rnbqkbnr/ppp1pppp/7P/8/2P5/3p4/PP1PPPP1/RNBQKBNR b KQkq c3 0 4")?;
+            let moves = board.get_pawn_moves(&Position::d3(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::c2(), MoveKind::EnPassant(Position::c3())),
+                (Position::e2(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black promotion
+        {
+            let board = fen::parse_fen("rnbqkbnr/p1pppppp/8/6B1/8/3P4/PPp1PPPP/RN1QKBNR b KQkq - 1 5")?;
+            let moves = board.get_pawn_moves(&Position::c2(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::b1(), MoveKind::Promotion),
+                (Position::c1(), MoveKind::Promotion),
+                (Position::d1(), MoveKind::Promotion),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        Ok(())
     }
 }
