@@ -8,25 +8,28 @@ use game::Game;
 use piece::PromotionType;
 
 pub fn run() {
-    let parsed_board =
+    let board =
         fen::parse_fen("r2qkbnr/p1Pppppp/b1n5/1p6/8/8/P1PPPPPP/RNBQKBNR w KQkq - 1 5").unwrap();
-    let mut parsed_game = Game::new(parsed_board);
+    let mut game = Game::new(board);
 
-    let parsed_moves = vec![MoveRequest::promotion(
+    let moves = vec![MoveRequest::promotion(
         Position::c7(),
         Position::c8(),
-        PromotionType::Knight,
+        PromotionType::Queen,
     )];
 
-    perform_moves(&mut parsed_game, parsed_moves);
+    perform_moves(&mut game, moves);
 }
 
 pub fn perform_moves(game: &mut Game, move_requests: Vec<MoveRequest>) {
+    println!("{}\n", fen::generate_fen(&game.board));
+    println!("{}\n", game.board);
+
     for request in move_requests {
         match game.attempt_move(request) {
             Ok(_) => {
-                println!("{}\n", game.board);
                 println!("{}\n", fen::generate_fen(&game.board));
+                println!("{}\n", game.board);
             }
             Err(error) => {
                 println!("{error:?}");

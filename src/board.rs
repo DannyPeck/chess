@@ -5,7 +5,10 @@ pub mod utils;
 
 use std::collections::HashMap;
 
-use crate::piece::{Piece, PieceType, PromotionType, Side};
+use crate::{
+    piece::{Piece, PieceType, PromotionType, Side},
+    piece_position,
+};
 use position::{Offset, Position};
 
 const BOARD_SIZE: usize = 64;
@@ -107,7 +110,7 @@ impl Board {
     }
 
     pub fn new(
-        pieces: Vec<(Piece, Position)>,
+        pieces: Vec<(Position, Piece)>,
         current_turn: Side,
         castle_rights: CastleRights,
         en_passant_target: Option<Position>,
@@ -160,8 +163,8 @@ impl Board {
         self.full_moves
     }
 
-    pub fn get_piece(&self, position: &Position) -> Option<&Piece> {
-        self.positions[position.value()].as_ref()
+    pub fn get_piece(&self, position: &Position) -> &Option<Piece> {
+        &self.positions[position.value()]
     }
 
     pub fn is_occupiable_position(&self, position: &Position, side: &Side) -> bool {
@@ -193,13 +196,13 @@ impl Board {
         self.positions[position.value()] = opt_piece;
     }
 
-    pub fn add_piece(&mut self, piece: Piece, position: &Position) {
+    pub fn add_piece(&mut self, position: &Position, piece: Piece) {
         self.set_position(&position, Some(piece));
     }
 
-    pub fn add_pieces(&mut self, pieces: Vec<(Piece, Position)>) {
-        for (piece, position) in pieces {
-            self.add_piece(piece, &position);
+    pub fn add_pieces(&mut self, pieces: Vec<(Position, Piece)>) {
+        for (position, piece) in pieces {
+            self.add_piece(&position, piece);
         }
     }
 
@@ -224,12 +227,13 @@ impl Board {
     fn get_move(&self, request: &MoveRequest) -> Result<MoveKind, MoveError> {
         let piece = self
             .get_piece(&request.start)
+            .as_ref()
             .filter(|piece| piece.side == self.current_turn)
             .ok_or(MoveError::new(
                 "Unable to find a piece for the current player at the provided position.",
             ))?;
 
-        let moves = self.get_moves(piece, &request.start);
+        let moves = self.get_moves(&piece, &request.start);
         let move_kind = moves
             .get(&request.end)
             .ok_or(MoveError::new("Provided move is not valid."))?;
@@ -566,43 +570,40 @@ impl Board {
 
 impl Default for Board {
     fn default() -> Self {
-        let mut pieces = Vec::new();
-
-        // White piece
-        pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::a2()));
-        pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::b2()));
-        pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::c2()));
-        pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::d2()));
-        pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::e2()));
-        pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::f2()));
-        pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::g2()));
-        pieces.push((Piece::new(PieceType::Pawn, Side::White), Position::h2()));
-        pieces.push((Piece::new(PieceType::Rook, Side::White), Position::a1()));
-        pieces.push((Piece::new(PieceType::Rook, Side::White), Position::h1()));
-        pieces.push((Piece::new(PieceType::Knight, Side::White), Position::b1()));
-        pieces.push((Piece::new(PieceType::Knight, Side::White), Position::g1()));
-        pieces.push((Piece::new(PieceType::Bishop, Side::White), Position::c1()));
-        pieces.push((Piece::new(PieceType::Bishop, Side::White), Position::f1()));
-        pieces.push((Piece::new(PieceType::King, Side::White), Position::e1()));
-        pieces.push((Piece::new(PieceType::Queen, Side::White), Position::d1()));
-
-        // Black pieces
-        pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::a7()));
-        pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::b7()));
-        pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::c7()));
-        pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::d7()));
-        pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::e7()));
-        pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::f7()));
-        pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::g7()));
-        pieces.push((Piece::new(PieceType::Pawn, Side::Black), Position::h7()));
-        pieces.push((Piece::new(PieceType::Rook, Side::Black), Position::a8()));
-        pieces.push((Piece::new(PieceType::Rook, Side::Black), Position::h8()));
-        pieces.push((Piece::new(PieceType::Knight, Side::Black), Position::b8()));
-        pieces.push((Piece::new(PieceType::Knight, Side::Black), Position::g8()));
-        pieces.push((Piece::new(PieceType::Bishop, Side::Black), Position::c8()));
-        pieces.push((Piece::new(PieceType::Bishop, Side::Black), Position::f8()));
-        pieces.push((Piece::new(PieceType::King, Side::Black), Position::e8()));
-        pieces.push((Piece::new(PieceType::Queen, Side::Black), Position::d8()));
+        let pieces = vec![
+            piece_position!(a2, Pawn, White),
+            piece_position!(b2, Pawn, White),
+            piece_position!(c2, Pawn, White),
+            piece_position!(d2, Pawn, White),
+            piece_position!(e2, Pawn, White),
+            piece_position!(f2, Pawn, White),
+            piece_position!(g2, Pawn, White),
+            piece_position!(h2, Pawn, White),
+            piece_position!(a1, Rook, White),
+            piece_position!(b1, Knight, White),
+            piece_position!(c1, Bishop, White),
+            piece_position!(d1, Queen, White),
+            piece_position!(e1, King, White),
+            piece_position!(f1, Bishop, White),
+            piece_position!(g1, Knight, White),
+            piece_position!(h1, Rook, White),
+            piece_position!(a7, Pawn, Black),
+            piece_position!(b7, Pawn, Black),
+            piece_position!(c7, Pawn, Black),
+            piece_position!(d7, Pawn, Black),
+            piece_position!(e7, Pawn, Black),
+            piece_position!(f7, Pawn, Black),
+            piece_position!(g7, Pawn, Black),
+            piece_position!(h7, Pawn, Black),
+            piece_position!(a8, Rook, Black),
+            piece_position!(b8, Knight, Black),
+            piece_position!(c8, Bishop, Black),
+            piece_position!(d8, Queen, Black),
+            piece_position!(e8, King, Black),
+            piece_position!(f8, Bishop, Black),
+            piece_position!(g8, Knight, Black),
+            piece_position!(h8, Rook, Black),
+        ];
 
         let mut board = Board::empty();
 
@@ -636,5 +637,190 @@ impl std::fmt::Display for Board {
         }
 
         write!(f, "{board_string}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{board_position, fen};
+
+    use super::*;
+
+    #[test]
+    fn default_test() {
+        let board = Board::default();
+
+        let position_tests: Vec<(Position, Option<Piece>)> = vec![
+            board_position!(a1, Rook, White),
+            board_position!(b1, Knight, White),
+            board_position!(c1, Bishop, White),
+            board_position!(d1, Queen, White),
+            board_position!(e1, King, White),
+            board_position!(f1, Bishop, White),
+            board_position!(g1, Knight, White),
+            board_position!(h1, Rook, White),
+            board_position!(a2, Pawn, White),
+            board_position!(b2, Pawn, White),
+            board_position!(c2, Pawn, White),
+            board_position!(d2, Pawn, White),
+            board_position!(e2, Pawn, White),
+            board_position!(f2, Pawn, White),
+            board_position!(g2, Pawn, White),
+            board_position!(h2, Pawn, White),
+            board_position!(a3, None),
+            board_position!(b3, None),
+            board_position!(c3, None),
+            board_position!(d3, None),
+            board_position!(e3, None),
+            board_position!(f3, None),
+            board_position!(g3, None),
+            board_position!(h3, None),
+            board_position!(a4, None),
+            board_position!(b4, None),
+            board_position!(c4, None),
+            board_position!(d4, None),
+            board_position!(e4, None),
+            board_position!(f4, None),
+            board_position!(g4, None),
+            board_position!(h4, None),
+            board_position!(a5, None),
+            board_position!(b5, None),
+            board_position!(c5, None),
+            board_position!(d5, None),
+            board_position!(e5, None),
+            board_position!(f5, None),
+            board_position!(g5, None),
+            board_position!(h5, None),
+            board_position!(a6, None),
+            board_position!(b6, None),
+            board_position!(c6, None),
+            board_position!(d6, None),
+            board_position!(e6, None),
+            board_position!(f6, None),
+            board_position!(g6, None),
+            board_position!(h6, None),
+            board_position!(a7, Pawn, Black),
+            board_position!(b7, Pawn, Black),
+            board_position!(c7, Pawn, Black),
+            board_position!(d7, Pawn, Black),
+            board_position!(e7, Pawn, Black),
+            board_position!(f7, Pawn, Black),
+            board_position!(g7, Pawn, Black),
+            board_position!(h7, Pawn, Black),
+            board_position!(a8, Rook, Black),
+            board_position!(b8, Knight, Black),
+            board_position!(c8, Bishop, Black),
+            board_position!(d8, Queen, Black),
+            board_position!(e8, King, Black),
+            board_position!(f8, Bishop, Black),
+            board_position!(g8, Knight, Black),
+            board_position!(h8, Rook, Black),
+        ];
+
+        for (position, piece) in position_tests {
+            assert_eq!(board.get_piece(&position), &piece);
+        }
+
+        assert_eq!(*board.get_current_turn(), Side::White);
+
+        assert_eq!(
+            *board.get_castle_rights(),
+            CastleRights::new(true, true, true, true)
+        );
+
+        assert_eq!(*board.get_en_passant_target(), None);
+
+        assert_eq!(board.get_half_moves(), 0);
+
+        assert_eq!(board.get_full_moves(), 1);
+    }
+
+    #[test]
+    fn empty_test() {
+        let board = Board::empty();
+
+        let position_tests: Vec<(Position, Option<Piece>)> = vec![
+            board_position!(a1, None),
+            board_position!(b1, None),
+            board_position!(c1, None),
+            board_position!(d1, None),
+            board_position!(e1, None),
+            board_position!(f1, None),
+            board_position!(g1, None),
+            board_position!(h1, None),
+            board_position!(a2, None),
+            board_position!(b2, None),
+            board_position!(c2, None),
+            board_position!(d2, None),
+            board_position!(e2, None),
+            board_position!(f2, None),
+            board_position!(g2, None),
+            board_position!(h2, None),
+            board_position!(a3, None),
+            board_position!(b3, None),
+            board_position!(c3, None),
+            board_position!(d3, None),
+            board_position!(e3, None),
+            board_position!(f3, None),
+            board_position!(g3, None),
+            board_position!(h3, None),
+            board_position!(a4, None),
+            board_position!(b4, None),
+            board_position!(c4, None),
+            board_position!(d4, None),
+            board_position!(e4, None),
+            board_position!(f4, None),
+            board_position!(g4, None),
+            board_position!(h4, None),
+            board_position!(a5, None),
+            board_position!(b5, None),
+            board_position!(c5, None),
+            board_position!(d5, None),
+            board_position!(e5, None),
+            board_position!(f5, None),
+            board_position!(g5, None),
+            board_position!(h5, None),
+            board_position!(a6, None),
+            board_position!(b6, None),
+            board_position!(c6, None),
+            board_position!(d6, None),
+            board_position!(e6, None),
+            board_position!(f6, None),
+            board_position!(g6, None),
+            board_position!(h6, None),
+            board_position!(a7, None),
+            board_position!(b7, None),
+            board_position!(c7, None),
+            board_position!(d7, None),
+            board_position!(e7, None),
+            board_position!(f7, None),
+            board_position!(g7, None),
+            board_position!(h7, None),
+            board_position!(a8, None),
+            board_position!(b8, None),
+            board_position!(c8, None),
+            board_position!(d8, None),
+            board_position!(e8, None),
+            board_position!(f8, None),
+            board_position!(g8, None),
+            board_position!(h8, None),
+        ];
+
+        for (position, piece) in position_tests {
+            assert_eq!(board.get_piece(&position), &piece);
+        }
+
+        assert_eq!(*board.get_current_turn(), Side::White);
+
+        assert_eq!(
+            *board.get_castle_rights(),
+            CastleRights::new(true, true, true, true)
+        );
+
+        assert_eq!(*board.get_en_passant_target(), None);
+
+        assert_eq!(board.get_half_moves(), 0);
+
+        assert_eq!(board.get_full_moves(), 1);
     }
 }

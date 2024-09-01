@@ -41,7 +41,7 @@ pub fn positions_to_string(positions: &HashMap<Position, MoveKind>) -> String {
     let mut output = String::new();
 
     let mut counter = 0;
-    for (position, move_type) in positions {
+    for (position, _) in positions {
         if counter > 0 {
             output += ", ";
         }
@@ -52,4 +52,28 @@ pub fn positions_to_string(positions: &HashMap<Position, MoveKind>) -> String {
     }
 
     output
+}
+
+#[macro_export]
+macro_rules! board_position {
+    ( $position:ident, None ) => {
+        (Position::$position(), None)
+    };
+
+    ( $position:ident, $piece_type:ident, $side:ident ) => {
+        (
+            Position::$position(),
+            Some(Piece::new(PieceType::$piece_type, Side::$side)),
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! piece_position {
+    ( $position:ident, $piece_type:ident, $side:ident ) => {
+        (
+            Position::$position(),
+            Piece::new(PieceType::$piece_type, Side::$side),
+        )
+    };
 }

@@ -1,3 +1,10 @@
+#[macro_export]
+macro_rules! piece {
+    ( $piece_type:ident, $side:ident ) => {
+        Piece::new(PieceType::$piece_type, Side::$side)
+    };
+}
+
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum PieceType {
     Pawn,
@@ -67,18 +74,18 @@ impl Piece {
 
     pub fn from(notation: char) -> Option<Piece> {
         match notation {
-            'P' => Some(Piece::new(PieceType::Pawn, Side::White)),
-            'R' => Some(Piece::new(PieceType::Rook, Side::White)),
-            'N' => Some(Piece::new(PieceType::Knight, Side::White)),
-            'B' => Some(Piece::new(PieceType::Bishop, Side::White)),
-            'K' => Some(Piece::new(PieceType::King, Side::White)),
-            'Q' => Some(Piece::new(PieceType::Queen, Side::White)),
-            'p' => Some(Piece::new(PieceType::Pawn, Side::Black)),
-            'r' => Some(Piece::new(PieceType::Rook, Side::Black)),
-            'n' => Some(Piece::new(PieceType::Knight, Side::Black)),
-            'b' => Some(Piece::new(PieceType::Bishop, Side::Black)),
-            'k' => Some(Piece::new(PieceType::King, Side::Black)),
-            'q' => Some(Piece::new(PieceType::Queen, Side::Black)),
+            'P' => Some(piece!(Pawn, White)),
+            'R' => Some(piece!(Rook, White)),
+            'N' => Some(piece!(Knight, White)),
+            'B' => Some(piece!(Bishop, White)),
+            'K' => Some(piece!(King, White)),
+            'Q' => Some(piece!(Queen, White)),
+            'p' => Some(piece!(Pawn, Black)),
+            'r' => Some(piece!(Rook, Black)),
+            'n' => Some(piece!(Knight, Black)),
+            'b' => Some(piece!(Bishop, Black)),
+            'k' => Some(piece!(King, Black)),
+            'q' => Some(piece!(Queen, Black)),
             _ => None,
         }
     }
@@ -109,75 +116,34 @@ mod tests {
 
     #[test]
     fn validate_piece_notation() {
-        assert_eq!(Piece::new(PieceType::Pawn, Side::White).to_string(), "P");
-        assert_eq!(Piece::new(PieceType::Pawn, Side::Black).to_string(), "p");
-
-        assert_eq!(Piece::new(PieceType::Knight, Side::White).to_string(), "N");
-        assert_eq!(Piece::new(PieceType::Knight, Side::Black).to_string(), "n");
-
-        assert_eq!(Piece::new(PieceType::Bishop, Side::White).to_string(), "B");
-        assert_eq!(Piece::new(PieceType::Bishop, Side::Black).to_string(), "b");
-
-        assert_eq!(Piece::new(PieceType::Rook, Side::White).to_string(), "R");
-        assert_eq!(Piece::new(PieceType::Rook, Side::Black).to_string(), "r");
-
-        assert_eq!(Piece::new(PieceType::Queen, Side::White).to_string(), "Q");
-        assert_eq!(Piece::new(PieceType::Queen, Side::Black).to_string(), "q");
-
-        assert_eq!(Piece::new(PieceType::King, Side::White).to_string(), "K");
-        assert_eq!(Piece::new(PieceType::King, Side::Black).to_string(), "k");
+        assert_eq!(piece!(Pawn, White).to_string(), "P");
+        assert_eq!(piece!(Pawn, Black).to_string(), "p");
+        assert_eq!(piece!(Knight, White).to_string(), "N");
+        assert_eq!(piece!(Knight, Black).to_string(), "n");
+        assert_eq!(piece!(Bishop, White).to_string(), "B");
+        assert_eq!(piece!(Bishop, Black).to_string(), "b");
+        assert_eq!(piece!(Rook, White).to_string(), "R");
+        assert_eq!(piece!(Rook, Black).to_string(), "r");
+        assert_eq!(piece!(Queen, White).to_string(), "Q");
+        assert_eq!(piece!(Queen, Black).to_string(), "q");
+        assert_eq!(piece!(King, White).to_string(), "K");
+        assert_eq!(piece!(King, Black).to_string(), "k");
     }
 
     #[test]
     fn from_notation() {
-        assert_eq!(
-            Piece::from('P').unwrap(),
-            Piece::new(PieceType::Pawn, Side::White)
-        );
-        assert_eq!(
-            Piece::from('p').unwrap(),
-            Piece::new(PieceType::Pawn, Side::Black)
-        );
-        assert_eq!(
-            Piece::from('N').unwrap(),
-            Piece::new(PieceType::Knight, Side::White)
-        );
-        assert_eq!(
-            Piece::from('n').unwrap(),
-            Piece::new(PieceType::Knight, Side::Black)
-        );
-        assert_eq!(
-            Piece::from('B').unwrap(),
-            Piece::new(PieceType::Bishop, Side::White)
-        );
-        assert_eq!(
-            Piece::from('b').unwrap(),
-            Piece::new(PieceType::Bishop, Side::Black)
-        );
-        assert_eq!(
-            Piece::from('R').unwrap(),
-            Piece::new(PieceType::Rook, Side::White)
-        );
-        assert_eq!(
-            Piece::from('r').unwrap(),
-            Piece::new(PieceType::Rook, Side::Black)
-        );
-        assert_eq!(
-            Piece::from('Q').unwrap(),
-            Piece::new(PieceType::Queen, Side::White)
-        );
-        assert_eq!(
-            Piece::from('q').unwrap(),
-            Piece::new(PieceType::Queen, Side::Black)
-        );
-        assert_eq!(
-            Piece::from('K').unwrap(),
-            Piece::new(PieceType::King, Side::White)
-        );
-        assert_eq!(
-            Piece::from('k').unwrap(),
-            Piece::new(PieceType::King, Side::Black)
-        );
+        assert_eq!(Piece::from('P').unwrap(), piece!(Pawn, White));
+        assert_eq!(Piece::from('p').unwrap(), piece!(Pawn, Black));
+        assert_eq!(Piece::from('N').unwrap(), piece!(Knight, White));
+        assert_eq!(Piece::from('n').unwrap(), piece!(Knight, Black));
+        assert_eq!(Piece::from('B').unwrap(), piece!(Bishop, White));
+        assert_eq!(Piece::from('b').unwrap(), piece!(Bishop, Black));
+        assert_eq!(Piece::from('R').unwrap(), piece!(Rook, White));
+        assert_eq!(Piece::from('r').unwrap(), piece!(Rook, Black));
+        assert_eq!(Piece::from('Q').unwrap(), piece!(Queen, White));
+        assert_eq!(Piece::from('q').unwrap(), piece!(Queen, Black));
+        assert_eq!(Piece::from('K').unwrap(), piece!(King, White));
+        assert_eq!(Piece::from('k').unwrap(), piece!(King, Black));
 
         assert_eq!(Piece::from('a'), None);
     }
