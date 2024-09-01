@@ -175,6 +175,18 @@ impl Board {
         }
     }
 
+    pub fn are_positions_empty(&self, positions: &Vec<Position>) -> bool {
+        let mut empty = true;
+        for position in positions {
+            if self.contains_piece(position) {
+                empty = false;
+                break;
+            }
+        }
+
+        empty
+    }
+
     pub fn contains_piece(&self, position: &Position) -> bool {
         self.get_piece(position).is_some()
     }
@@ -514,20 +526,32 @@ impl Board {
         match self.current_turn {
             Side::White => {
                 if self.castle_rights.white_short_castle_rights {
-                    valid_positions.insert(Position::g1(), MoveKind::ShortCastle);
+                    let castle_positions = vec![Position::f1(), Position::g1()];
+                    if self.are_positions_empty(&castle_positions) {
+                        valid_positions.insert(Position::g1(), MoveKind::ShortCastle);
+                    }
                 }
 
                 if self.castle_rights.white_long_castle_rights {
-                    valid_positions.insert(Position::c1(), MoveKind::LongCastle);
+                    let castle_positions = vec![Position::b1(), Position::c1(), Position::d1()];
+                    if self.are_positions_empty(&castle_positions) {
+                        valid_positions.insert(Position::c1(), MoveKind::LongCastle);
+                    }
                 }
             }
             Side::Black => {
                 if self.castle_rights.black_short_castle_rights {
-                    valid_positions.insert(Position::g8(), MoveKind::ShortCastle);
+                    let castle_positions = vec![Position::f8(), Position::g8()];
+                    if self.are_positions_empty(&castle_positions) {
+                        valid_positions.insert(Position::g8(), MoveKind::ShortCastle);
+                    }
                 }
 
                 if self.castle_rights.black_long_castle_rights {
-                    valid_positions.insert(Position::c8(), MoveKind::LongCastle);
+                    let castle_positions = vec![Position::b8(), Position::c8(), Position::d8()];
+                    if self.are_positions_empty(&castle_positions) {
+                        valid_positions.insert(Position::c8(), MoveKind::LongCastle);
+                    }
                 }
             }
         }
@@ -1302,4 +1326,306 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn get_king_moves_test() -> Result<(), ParseError> {
+        // All directions
+        {
+            let board =
+                fen::parse_fen("rnbqkbnr/2pppppp/4P3/1p6/3K4/p7/PPPP1PPP/RNBQ1BNR w kq - 0 7")?;
+            let moves = board.get_king_moves(&Position::d4(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d5(), MoveKind::Move),
+                (Position::e5(), MoveKind::Move),
+                (Position::e4(), MoveKind::Move),
+                (Position::e3(), MoveKind::Move),
+                (Position::d3(), MoveKind::Move),
+                (Position::c3(), MoveKind::Move),
+                (Position::c4(), MoveKind::Move),
+                (Position::c5(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Captures & own pieces, no checks or castles
+        {
+            let board =
+                fen::parse_fen("rnbqkbnr/1p1pppp1/p6p/8/2pKP3/8/PPPP1PPP/RNBQ1BNR w kq - 0 5")?;
+            let moves = board.get_king_moves(&Position::d4(), &Side::White);
+            // Still c5 as a capture, but not e4 because of our own piece
+            let expected_moves = HashMap::from([
+                (Position::d5(), MoveKind::Move),
+                (Position::e5(), MoveKind::Move),
+                (Position::e3(), MoveKind::Move),
+                (Position::d3(), MoveKind::Move),
+                (Position::c3(), MoveKind::Move),
+                (Position::c4(), MoveKind::Move),
+                (Position::c5(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White short & long castles
+        {
+            let board =
+                fen::parse_fen("r3k2r/ppp1pp1p/2nqbnpb/3p4/3P4/2NQBNPB/PPP1PP1P/R3K2R w KQkq - 4 8")?;
+            let moves = board.get_king_moves(&Position::e1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d1(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+                (Position::f1(), MoveKind::Move),
+                (Position::c1(), MoveKind::LongCastle),
+                (Position::g1(), MoveKind::ShortCastle),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no long castle because rook move
+        {
+            let board =
+                fen::parse_fen("r3k2r/ppp1ppbp/2nqbnp1/3p4/3P4/2NQBNPB/PPP1PP1P/1R2K2R w Kkq - 6 9")?;
+            let moves = board.get_king_moves(&Position::e1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d1(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+                (Position::f1(), MoveKind::Move),
+                (Position::g1(), MoveKind::ShortCastle),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no short castle because rook move
+        {
+            let board =
+                fen::parse_fen("r3k2r/ppp1ppbp/2nqbnp1/3p4/3P4/2NQBNPB/PPP1PP1P/R3K1R1 w Qkq - 6 9")?;
+            let moves = board.get_king_moves(&Position::e1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d1(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+                (Position::f1(), MoveKind::Move),
+                (Position::c1(), MoveKind::LongCastle),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no castle because king move
+        {
+            let board =
+                fen::parse_fen("r3k2r/ppp1ppbp/2nqbnp1/3p4/3P4/2NQBNPB/PPP1PP1P/R2K3R w kq - 6 9")?;
+            let moves = board.get_king_moves(&Position::d1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d2(), MoveKind::Move),
+                (Position::c1(), MoveKind::Move),
+                (Position::e1(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no long castle because piece on b1
+        {
+            let board =
+                fen::parse_fen("rn2kbnr/ppp1pppp/3qb3/3p4/3P4/3QB3/PPP1PPPP/RN2KBNR w KQkq - 4 4")?;
+            let moves = board.get_king_moves(&Position::e1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d1(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no long castle because piece on c1
+        {
+            let board =
+                fen::parse_fen("rnb1kbnr/pp2pppp/2pq4/3p4/3P4/2NQ4/PPP1PPPP/R1B1KBNR w KQkq - 0 4")?;
+            let moves = board.get_king_moves(&Position::e1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d1(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no long castle because piece on d1
+        {
+            let board =
+                fen::parse_fen("rnbqkbnr/pp3ppp/2p1p3/3p4/3P4/N3B3/PPP1PPPP/R2QKBNR w KQkq - 0 4")?;
+            let moves = board.get_king_moves(&Position::e1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d2(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no short castle because piece on f1
+        {
+            let board =
+                fen::parse_fen("rnbqkbnr/pppppp1p/6p1/8/8/5N2/PPPPPPPP/RNBQKB1R w KQkq - 0 2")?;
+            let moves = board.get_king_moves(&Position::e1(), &Side::White);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no short castle because piece on g1
+        {
+            let board =
+                fen::parse_fen("rnbqkbnr/ppp2ppp/3pp3/8/8/3BP3/PPPP1PPP/RNBQK1NR w KQkq - 0 3")?;
+            let moves = board.get_king_moves(&Position::e1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::e2(), MoveKind::Move),
+                (Position::f1(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no moves
+        {
+            let board = Board::default();
+            let moves = board.get_king_moves(&Position::e1(), &Side::White);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black short & long castles
+        {
+            let board =
+                fen::parse_fen("r3k2r/ppp1pp1p/2nqbnpb/3p4/3P4/2PQPPP1/PP5P/RNB1KBNR b KQkq - 0 8")?;
+            let moves = board.get_king_moves(&Position::e8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d8(), MoveKind::Move),
+                (Position::d7(), MoveKind::Move),
+                (Position::f8(), MoveKind::Move),
+                (Position::c8(), MoveKind::LongCastle),
+                (Position::g8(), MoveKind::ShortCastle),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no long castle because rook move
+        {
+            let board =
+                fen::parse_fen("1r2k2r/ppp1pp1p/2nqbnpb/3p4/3P1P2/2PQP1P1/PP5P/RNB1KBNR b KQk - 0 9")?;
+            let moves = board.get_king_moves(&Position::e8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d8(), MoveKind::Move),
+                (Position::d7(), MoveKind::Move),
+                (Position::f8(), MoveKind::Move),
+                (Position::g8(), MoveKind::ShortCastle),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no short castle because rook move
+        {
+            let board =
+                fen::parse_fen("r3k1r1/ppp1pp1p/2nqbnpb/3p4/3P2P1/2PQPP2/PP5P/RNB1KBNR b KQq - 0 9")?;
+            let moves = board.get_king_moves(&Position::e8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d8(), MoveKind::Move),
+                (Position::d7(), MoveKind::Move),
+                (Position::f8(), MoveKind::Move),
+                (Position::c8(), MoveKind::LongCastle),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no castle because king move
+        {
+            let board =
+                fen::parse_fen("r2k3r/ppp1pp1p/2nqbnpb/3p4/3P2P1/2PQPP2/PP5P/RNB1KBNR b KQ - 0 9")?;
+            let moves = board.get_king_moves(&Position::d8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d7(), MoveKind::Move),
+                (Position::c8(), MoveKind::Move),
+                (Position::e8(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no long castle because piece on b8
+        {
+            let board =
+                fen::parse_fen("rn2kbnr/ppp1pppp/3qb3/3p4/3P4/2P5/PP1QPPPP/RNB1KBNR b KQkq - 0 4")?;
+            let moves = board.get_king_moves(&Position::e8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d8(), MoveKind::Move),
+                (Position::d7(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no long castle because piece on c8
+        {
+            let board =
+                fen::parse_fen("r1b1kbnr/ppp1pppp/2nq4/3p4/3P4/2P1P3/PP3PPP/RNBQKBNR b KQkq - 0 4")?;
+            let moves = board.get_king_moves(&Position::e8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d8(), MoveKind::Move),
+                (Position::d7(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no long castle because piece on d8
+        {
+            let board =
+                fen::parse_fen("r2qkbnr/ppp1pppp/2n5/3p1b2/3PP3/8/PPP2PPP/RNBQKBNR b KQkq - 0 4")?;
+            let moves = board.get_king_moves(&Position::e8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d7(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no short castle because piece on f8
+        {
+            let board =
+                fen::parse_fen("rnbqkb1r/pppppppp/7n/8/8/2N2P2/PPPPP1PP/R1BQKBNR b KQkq - 0 2")?;
+            let moves = board.get_king_moves(&Position::e8(), &Side::Black);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no short castle because piece on g8
+        {
+            let board =
+                fen::parse_fen("rnbqk1nr/pppp1ppp/3bp3/8/8/3PPP2/PPP3PP/RNBQKBNR b KQkq - 0 3")?;
+            let moves = board.get_king_moves(&Position::e8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::e7(), MoveKind::Move),
+                (Position::f8(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no moves
+        {
+            let board = Board::default();
+            let moves = board.get_king_moves(&Position::e8(), &Side::Black);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        Ok(())
+    }
 }
