@@ -1020,4 +1020,83 @@ mod tests {
 
         Ok(())
     }
+
+
+    #[test]
+    fn get_knight_moves_test() -> Result<(), ParseError> {
+        // All moves
+        {
+            let board = fen::parse_fen("rnbqkbnr/3ppppp/ppp5/8/4N3/3P1P2/PPP1P1PP/R1BQKBNR b KQkq - 0 4")?;
+            let moves = board.get_knight_moves(&Position::e4(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::f6(), MoveKind::Move),
+                (Position::g5(), MoveKind::Move),
+                (Position::g3(), MoveKind::Move),
+                (Position::f2(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+                (Position::c3(), MoveKind::Move),
+                (Position::c5(), MoveKind::Move),
+                (Position::d6(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // No moves
+        {
+            let board = fen::parse_fen("rnbqkbnr/1ppppppp/p7/8/8/P1P5/1P1PPPPP/RNBQKBNR b KQkq - 0 2")?;
+            let moves = board.get_knight_moves(&Position::b1(), &Side::White);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Left side of board
+        {
+            let board = fen::parse_fen("rnbqkbnr/2pppppp/pp6/8/8/N1P5/PP1PPPPP/R1BQKBNR w KQkq - 0 3")?;
+            let moves = board.get_knight_moves(&Position::a3(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::b5(), MoveKind::Move),
+                (Position::c4(), MoveKind::Move),
+                (Position::c2(), MoveKind::Move),
+                (Position::b1(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Right side of board
+        {
+            let board = fen::parse_fen("rnbqkbnr/pppppp2/6pp/8/8/5P1N/PPPPP1PP/RNBQKB1R w KQkq - 0 3")?;
+            let moves = board.get_knight_moves(&Position::h3(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::g5(), MoveKind::Move),
+                (Position::f4(), MoveKind::Move),
+                (Position::f2(), MoveKind::Move),
+                (Position::g1(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Captures and own pieces
+        {
+            let board = fen::parse_fen("rnbqkbnr/p1p1ppp1/1p1p3p/8/4N3/3P4/PPP1PPPP/R1BQKBNR w KQkq - 0 4")?;
+            let moves = board.get_knight_moves(&Position::e4(), &Side::White);
+            // No f2 because our piece is there, but still d6 because black's piece is there.
+            let expected_moves = HashMap::from([
+                (Position::f6(), MoveKind::Move),
+                (Position::g5(), MoveKind::Move),
+                (Position::g3(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+                (Position::c3(), MoveKind::Move),
+                (Position::c5(), MoveKind::Move),
+                (Position::d6(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        Ok(())
+    }
 }
