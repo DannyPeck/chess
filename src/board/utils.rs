@@ -11,13 +11,19 @@ where
     Position::from_offset(&position, offset).filter(filter)
 }
 
+pub enum WhileMoveResult {
+    Continue,
+    Capture,
+    Stop,
+}
+
 pub fn add_while_valid<F>(
     start: &Position,
     offset: &Offset,
     filter: F,
     valid_positions: &mut HashMap<Position, MoveKind>,
 ) where
-    F: Fn(&Position) -> bool,
+    F: Fn(&Position) -> WhileMoveResult,
 {
     // Don't allow no-op offsets
     if offset.file_offset == 0 && offset.rank_offset == 0 {
@@ -26,12 +32,19 @@ pub fn add_while_valid<F>(
 
     let mut current_position = start.clone();
     loop {
-        match get_if_valid(&current_position, &offset, &filter) {
-            Some(new_position) => {
-                current_position = new_position.clone();
-
-                valid_positions.insert(new_position, MoveKind::Move);
-            }
+        match Position::from_offset(&current_position, offset) {
+            Some(new_position) => match filter(&new_position) {
+                WhileMoveResult::Continue => {
+                    current_position = new_position.clone();
+                    valid_positions.insert(new_position, MoveKind::Move);
+                }
+                WhileMoveResult::Capture => {
+                    current_position = new_position.clone();
+                    valid_positions.insert(new_position, MoveKind::Move);
+                    break;
+                }
+                WhileMoveResult::Stop => break,
+            },
             None => break,
         };
     }
