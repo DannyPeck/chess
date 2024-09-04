@@ -3,22 +3,17 @@ pub mod fen;
 pub mod game;
 pub mod piece;
 
-use board::{position::Position, MoveRequest};
+use board::MoveRequest;
 use game::Game;
-use piece::PromotionType;
 
 pub fn run() {
     let board =
-        fen::parse_fen("r2qkbnr/p1Pppppp/b1n5/1p6/8/8/P1PPPPPP/RNBQKBNR w KQkq - 1 5").unwrap();
+        fen::parse_fen("rnb1kbnr/pp1ppppp/8/2p5/3P4/1P3N2/P3PPPP/q2QKBNR w Kkq - 0 6").unwrap();
     let mut game = Game::new(board);
 
-    let moves = vec![MoveRequest::promotion(
-        Position::c7(),
-        Position::c8(),
-        PromotionType::Queen,
-    )];
-
-    perform_moves(&mut game, moves);
+    println!("{}\n", fen::generate_fen(&game.board));
+    println!("{}\n", game.board);
+    println!("{}\n", game.get_relative_score());
 }
 
 pub fn perform_moves(game: &mut Game, move_requests: Vec<MoveRequest>) {
@@ -30,6 +25,7 @@ pub fn perform_moves(game: &mut Game, move_requests: Vec<MoveRequest>) {
             Ok(_) => {
                 println!("{}\n", fen::generate_fen(&game.board));
                 println!("{}\n", game.board);
+                println!("{}\n", game.get_relative_score());
             }
             Err(error) => {
                 println!("{error:?}");

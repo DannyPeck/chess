@@ -39,8 +39,7 @@ pub fn add_while_valid<F>(
                     valid_positions.insert(new_position, MoveKind::Move);
                 }
                 WhileMoveResult::Capture => {
-                    current_position = new_position.clone();
-                    valid_positions.insert(new_position, MoveKind::Move);
+                    valid_positions.insert(new_position, MoveKind::Capture);
                     break;
                 }
                 WhileMoveResult::Stop => break,

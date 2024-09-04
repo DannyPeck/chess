@@ -15,6 +15,19 @@ pub enum PieceType {
     King,
 }
 
+impl PieceType {
+    pub fn value(&self) -> u32 {
+        match self {
+            PieceType::Pawn => 1,
+            PieceType::Knight => 3,
+            PieceType::Bishop => 3,
+            PieceType::Rook => 5,
+            PieceType::Queen => 9,
+            PieceType::King => 0,
+        }
+    }
+}
+
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum PromotionType {
     Knight,
