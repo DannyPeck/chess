@@ -53,7 +53,7 @@ pub fn run() {
 
         println!("");
 
-        let move_state = board::get_move_state(game.get_board());
+        let move_state = game.get_move_state();
 
         let mut game_over = false;
         match move_state {

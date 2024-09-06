@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use crate::{
-    board::{self, Board, MoveError, MoveRequest, MoveState},
+    board::{self, Board, MoveError, MoveRequest, MoveState, RepetitionState},
     fen,
 };
 
@@ -8,15 +10,18 @@ pub struct Game {
     board: Board,
     index: usize,
     history: Vec<String>,
+    repetitions: HashMap<RepetitionState, u32>,
 }
 
 impl Game {
     pub fn new(board: Board) -> Game {
         let board_fen = fen::generate(&board);
+        let repetition_state = board.get_repetition_state();
         Game {
             board,
             index: 0,
             history: vec![board_fen],
+            repetitions: HashMap::from([(repetition_state, 1)]),
         }
     }
 
@@ -80,7 +85,26 @@ impl Game {
         self.history.push(new_fen);
         self.index += 1;
 
+        let repetition_state = self.board.get_repetition_state();
+        self.repetitions.entry(repetition_state).and_modify(|v| *v += 1).or_insert(1);
+
         Ok(())
+    }
+
+    pub fn get_move_state(&self) -> MoveState {
+        let mut stalemate_by_repetition = false;
+        for repetition_count in self.repetitions.values() {
+            if *repetition_count >= 3 {
+                stalemate_by_repetition = true;
+                break;
+            }
+        }
+
+        if stalemate_by_repetition {
+            MoveState::Stalemate
+        } else {
+            board::get_move_state(&self.board)
+        }
     }
 
     pub fn get_white_score(&self) -> i32 {

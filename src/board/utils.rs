@@ -31,7 +31,7 @@ impl std::fmt::Display for MoveError {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub enum MoveKind {
     Move,
     DoubleMove(Position), //  en passant target position
@@ -189,14 +189,7 @@ pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<(), MoveErr
 }
 
 pub fn get_move(board: &Board, request: &MoveRequest) -> Result<MoveKind, MoveError> {
-    let piece = board
-        .get_piece(&request.start)
-        .filter(|piece| piece.side == *board.get_current_turn())
-        .ok_or(MoveError::new(
-            "Unable to find a piece for the current player at the provided position.",
-        ))?;
-
-    let moves = get_piece_moves(board, &piece, &request.start);
+    let moves = get_piece_moves(board, &request.start)?;
     let move_kind = moves
         .get(&request.end)
         .ok_or(MoveError::new("Provided move is not valid."))?;
@@ -212,16 +205,29 @@ pub fn get_move(board: &Board, request: &MoveRequest) -> Result<MoveKind, MoveEr
 
 pub fn get_piece_moves(
     board: &Board,
-    piece: &Piece,
     start: &Position,
-) -> HashMap<Position, MoveKind> {
-    match piece.piece_type {
-        PieceType::Pawn => get_pawn_moves(board, start, &piece.side),
-        PieceType::Rook => get_rook_moves(board, start, &piece.side),
-        PieceType::Knight => get_knight_moves(board, start, &piece.side),
-        PieceType::Bishop => get_bishop_moves(board, start, &piece.side),
-        PieceType::King => get_king_moves(board, start, &piece.side),
-        PieceType::Queen => get_queen_moves(board, start, &piece.side),
+) -> Result<HashMap<Position, MoveKind>, MoveError> {
+    match board.get_piece(start) {
+        Some(piece) => {
+            if piece.side == *board.get_current_turn() {
+                let moves = match piece.piece_type {
+                    PieceType::Pawn => get_pawn_moves(board, start, &piece.side),
+                    PieceType::Rook => get_rook_moves(board, start, &piece.side),
+                    PieceType::Knight => get_knight_moves(board, start, &piece.side),
+                    PieceType::Bishop => get_bishop_moves(board, start, &piece.side),
+                    PieceType::King => get_king_moves(board, start, &piece.side),
+                    PieceType::Queen => get_queen_moves(board, start, &piece.side),
+                };
+
+                Ok(moves)
+            } else {
+                Err(MoveError::new(
+                    "Unable to find a piece for the current player at the provided position.",
+                ))
+            }
+                
+        },
+        None => Err(MoveError::new("No piece found at the provided position.")),
     }
 }
 
@@ -530,9 +536,9 @@ pub fn get_all_moves(board: &Board, side: &Side) -> HashMap<Position, HashMap<Po
     };
 
     for position in piece_positions {
-        let piece = board.get_piece(position).unwrap();
-        let moves = get_piece_moves(board, &piece, position);
-        all_moves.insert(position.clone(), moves);
+        if let Ok(moves) = get_piece_moves(board, position) {
+            all_moves.insert(position.clone(), moves);
+        }
     }
 
     all_moves
@@ -629,6 +635,37 @@ pub fn is_en_passant_target(board: &Board, position: &Position) -> bool {
     match board.get_en_passant_target() {
         Some(en_passant_target) => position == en_passant_target,
         None => false,
+    }
+}
+
+pub fn possible_en_passant_capture(board: &Board) -> bool {
+     match board.get_en_passant_target() {
+        Some(target) => {
+            let left_diagonal = match board.get_current_turn() {
+                Side::White => Position::from_file_and_rank(target.file() - 1, target.rank() - 1),
+                Side::Black => Position::from_file_and_rank(target.file() - 1, target.rank() + 1),
+            };
+
+            let right_diagonal = match board.get_current_turn() {
+                Side::White => Position::from_file_and_rank(target.file() + 1, target.rank() - 1),
+                Side::Black => Position::from_file_and_rank(target.file() - 1, target.rank() - 1),
+            };
+
+            let mut valid_capture = false;
+            if let Ok(moves) = get_piece_moves(board, &left_diagonal) {
+                valid_capture = moves.contains_key(target);
+            };
+
+            // Only check the next position if we didn't already find a valid capture.
+            if !valid_capture {
+                if let Ok(moves) = get_piece_moves(board, &right_diagonal) {
+                    valid_capture = moves.contains_key(target);
+                };
+            }
+
+            valid_capture
+        },
+        None => false
     }
 }
 

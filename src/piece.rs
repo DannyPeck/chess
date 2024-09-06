@@ -5,7 +5,7 @@ macro_rules! piece {
     };
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub enum PieceType {
     Pawn,
     Knight,
@@ -57,7 +57,7 @@ impl PromotionType {
     }
 }
 
-#[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(Eq, PartialEq, Hash, Debug, Clone)]
 pub enum Side {
     White = 0,
     Black = 1,
@@ -84,7 +84,7 @@ impl std::fmt::Display for Side {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub struct Piece {
     pub piece_type: PieceType,
     pub side: Side,

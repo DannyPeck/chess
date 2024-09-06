@@ -19,7 +19,7 @@ use position::Position;
 const BOARD_SIZE: usize = 64;
 const EMPTY: Option<Piece> = None;
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub struct CastleRights {
     pub white_short_castle_rights: bool,
     pub white_long_castle_rights: bool,
@@ -41,6 +41,14 @@ impl CastleRights {
             black_long_castle_rights,
         }
     }
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub struct RepetitionState {
+    positions: [Option<Piece>; BOARD_SIZE],
+    current_turn: Side,
+    castle_rights: CastleRights,
+    en_passant_capture: Option<Position>,
 }
 
 #[derive(Clone, Debug)]
@@ -129,6 +137,21 @@ impl Board {
 
     pub fn get_full_moves(&self) -> u32 {
         self.full_moves
+    }
+
+    pub fn get_repetition_state(&self) -> RepetitionState {
+        let en_passant_capture = if utils::possible_en_passant_capture(&self) {
+            self.en_passant_target.clone()
+        } else {
+            None
+        };
+
+        RepetitionState {
+            positions: self.positions.clone(),
+            current_turn: self.current_turn.clone(),
+            castle_rights: self.castle_rights.clone(),
+            en_passant_capture
+        }
     }
 
     pub fn get_white_positions(&self) -> &HashSet<Position> {
