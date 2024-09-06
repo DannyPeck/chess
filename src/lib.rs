@@ -36,7 +36,22 @@ pub fn run() {
 
     let mut keep_going = true;
     while keep_going {
-        println!("{}\n", game.get_board());
+        let black_score = game.get_black_score();
+        let white_score = game.get_white_score();
+
+        if black_score > white_score {
+            let relative_score = black_score - white_score;
+            println!("+{relative_score}");
+        }
+        
+        println!("{}", game.get_board());
+
+        if white_score > black_score {
+            let relative_score = white_score - black_score;
+            println!("+{relative_score}");
+        }
+
+        println!("");
 
         let move_state = board::get_move_state(game.get_board());
 

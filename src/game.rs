@@ -104,10 +104,4 @@ impl Game {
 
         score
     }
-
-    pub fn get_relative_score(&self) -> i32 {
-        let white_score = self.get_white_score();
-        let black_score = self.get_black_score();
-        white_score - black_score
-    }
 }
