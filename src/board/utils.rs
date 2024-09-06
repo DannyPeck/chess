@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::{
     board::position::{Offset, Position},
     piece::{Piece, PieceType, PromotionType, Side},
+    ParseError,
 };
 
 use super::{rank, Board};
@@ -56,6 +57,26 @@ impl MoveRequest {
             start,
             end,
             promotion: Some(promotion_type),
+        }
+    }
+
+    pub fn from_coordinate(coordinate_notation: &str) -> Result<MoveRequest, ParseError> {
+        if coordinate_notation.len() < 4 {
+            return Err(ParseError::new("Notation is incomplete."));
+        }
+
+        let start = Position::from_str(&coordinate_notation[0..2])
+            .ok_or(ParseError::new("Invalid start position."))?;
+        let end = Position::from_str(&coordinate_notation[2..4])
+            .ok_or(ParseError::new("Invalid end position."))?;
+        let promotion = coordinate_notation.chars().nth(4);
+
+        match promotion {
+            Some(notation) => match PromotionType::from(notation) {
+                Some(promotion_type) => Ok(MoveRequest::promotion(start, end, promotion_type)),
+                None => Err(ParseError::new("Invalid promotion notation.")),
+            },
+            None => Ok(MoveRequest::new(start, end)),
         }
     }
 }
@@ -149,7 +170,7 @@ pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<(), MoveErr
             // We would not get the MoveKind promotion if it was an invalid request.
             let promotion_piece_type = request.promotion.unwrap().to_piece_type();
             Piece::new(promotion_piece_type, board.get_current_turn().clone())
-        },
+        }
         _ => moving_piece,
     };
 
@@ -631,7 +652,7 @@ macro_rules! piece_position {
 
 #[cfg(test)]
 mod tests {
-    use crate::fen::{self, ParseError};
+    use crate::fen;
 
     use super::*;
 
@@ -650,7 +671,8 @@ mod tests {
 
         // Promotion move request
         {
-            let move_request = MoveRequest::promotion(Position::a7(), Position::a8(), PromotionType::Queen);
+            let move_request =
+                MoveRequest::promotion(Position::a7(), Position::a8(), PromotionType::Queen);
             let expected_move_request = MoveRequest {
                 start: Position::a7(),
                 end: Position::a8(),
@@ -658,6 +680,67 @@ mod tests {
             };
             assert_eq!(move_request, expected_move_request);
         }
+    }
+
+    #[test]
+    fn move_request_from_coordinate_test() -> Result<(), ParseError> {
+        // Normal move
+        {
+            let move_request = MoveRequest::from_coordinate("e3e4").unwrap();
+            let expected_move_request = MoveRequest::new(Position::e3(), Position::e4());
+
+            assert_eq!(move_request, expected_move_request);
+        }
+
+        // Invalid start position
+        assert!(MoveRequest::from_coordinate("e9e4").is_err());
+
+        // Invalid end position
+        assert!(MoveRequest::from_coordinate("e3x2").is_err());
+
+        // Too small
+        assert!(MoveRequest::from_coordinate("e3e").is_err());
+
+        // Queen promotion
+        {
+            let move_request = MoveRequest::from_coordinate("a7a8q")?;
+            let expected_move_request =
+                MoveRequest::promotion(Position::a7(), Position::a8(), PromotionType::Queen);
+
+            assert_eq!(move_request, expected_move_request);
+        }
+
+        // Knight promotion
+        {
+            let move_request = MoveRequest::from_coordinate("a7a8n")?;
+            let expected_move_request =
+                MoveRequest::promotion(Position::a7(), Position::a8(), PromotionType::Knight);
+
+            assert_eq!(move_request, expected_move_request);
+        }
+
+        // Bishop promotion
+        {
+            let move_request = MoveRequest::from_coordinate("a7a8b")?;
+            let expected_move_request =
+                MoveRequest::promotion(Position::a7(), Position::a8(), PromotionType::Bishop);
+
+            assert_eq!(move_request, expected_move_request);
+        }
+
+        // Rook promotion
+        {
+            let move_request = MoveRequest::from_coordinate("a7a8r")?;
+            let expected_move_request =
+                MoveRequest::promotion(Position::a7(), Position::a8(), PromotionType::Rook);
+
+            assert_eq!(move_request, expected_move_request);
+        }
+
+        // Invalid promotion
+        assert!(MoveRequest::from_coordinate("a7a8p").is_err());
+
+        Ok(())
     }
 
     #[test]
@@ -1698,7 +1781,8 @@ mod tests {
 
         // White in 50 move rule stalemate
         {
-            let board = fen::parse("rnb1kbnr/ppppqppp/4p3/8/8/3P1P2/PPP1P1PP/RNBQKBNR w KQkq - 100 50")?;
+            let board =
+                fen::parse("rnb1kbnr/ppppqppp/4p3/8/8/3P1P2/PPP1P1PP/RNBQKBNR w KQkq - 100 50")?;
 
             assert_eq!(get_move_state(&board), MoveState::Stalemate);
         }

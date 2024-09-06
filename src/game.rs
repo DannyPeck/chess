@@ -1,6 +1,6 @@
 use crate::{
     board::{self, Board, MoveError, MoveRequest, MoveState},
-    fen, piece::Side,
+    fen,
 };
 
 #[derive(Debug)]

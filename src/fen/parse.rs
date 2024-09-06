@@ -1,16 +1,8 @@
 use crate::{
     board::{file, position::Position, rank, Board, CastleRights},
     piece::{Piece, Side},
+    ParseError,
 };
-
-#[derive(Debug)]
-pub struct ParseError(String);
-
-impl ParseError {
-    pub fn new(error: &str) -> ParseError {
-        ParseError(String::from(error))
-    }
-}
 
 pub fn parse(fen: &str) -> Result<Board, ParseError> {
     let mut fen_iter = fen.split(' ');

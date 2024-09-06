@@ -45,6 +45,16 @@ impl PromotionType {
             PromotionType::Queen => PieceType::Queen,
         }
     }
+
+    pub fn from(notation: char) -> Option<PromotionType> {
+        match notation {
+            'q' => Some(PromotionType::Queen),
+            'n' => Some(PromotionType::Knight),
+            'b' => Some(PromotionType::Bishop),
+            'r' => Some(PromotionType::Rook),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Eq, PartialEq, Debug, Clone)]

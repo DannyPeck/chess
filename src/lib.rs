@@ -3,19 +3,28 @@ pub mod fen;
 pub mod game;
 pub mod piece;
 
-use board::{position::Position, Board, MoveRequest};
+use board::{Board, MoveRequest};
 use game::Game;
+
+#[derive(Debug)]
+pub struct ParseError(String);
+
+impl ParseError {
+    pub fn new(error: &str) -> ParseError {
+        ParseError(String::from(error))
+    }
+}
 
 pub fn run() {
     let board = Board::default();
     let mut game = Game::new(board);
 
     let moves = vec![
-        MoveRequest::new(Position::e2(), Position::e3()),
-        MoveRequest::new(Position::f7(), Position::f6()),
-        MoveRequest::new(Position::f2(), Position::f4()),
-        MoveRequest::new(Position::g7(), Position::g5()),
-        MoveRequest::new(Position::d1(), Position::h5()),
+        MoveRequest::from_coordinate("e2e3").unwrap(),
+        MoveRequest::from_coordinate("f7f6").unwrap(),
+        MoveRequest::from_coordinate("f2f4").unwrap(),
+        MoveRequest::from_coordinate("g7g5").unwrap(),
+        MoveRequest::from_coordinate("d1h5").unwrap(),
     ];
 
     perform_moves(&mut game, moves);

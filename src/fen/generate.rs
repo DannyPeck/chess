@@ -98,7 +98,7 @@ pub fn generate_full_moves(full_moves: u32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fen::{self, ParseError};
+    use crate::{fen, ParseError};
 
     #[test]
     fn generate_test() -> Result<(), ParseError> {
