@@ -86,7 +86,10 @@ impl Game {
         self.index += 1;
 
         let repetition_state = self.board.get_repetition_state();
-        self.repetitions.entry(repetition_state).and_modify(|v| *v += 1).or_insert(1);
+        self.repetitions
+            .entry(repetition_state)
+            .and_modify(|v| *v += 1)
+            .or_insert(1);
 
         Ok(())
     }

@@ -20,8 +20,9 @@ pub mod game_options {
     pub const MOVE_OPTION: &str = "1";
     pub const PREVIOUS_OPTION: &str = "2";
     pub const NEXT_OPTION: &str = "3";
-    pub const RESIGN_OPTION: &str = "4";
-    pub const QUIT_OPTION: &str = "5";
+    pub const DRAW_OPTION: &str = "4";
+    pub const RESIGN_OPTION: &str = "5";
+    pub const QUIT_OPTION: &str = "6";
 }
 
 pub mod post_game_options {
@@ -43,7 +44,7 @@ pub fn run() {
             let relative_score = black_score - white_score;
             println!("+{relative_score}");
         }
-        
+
         println!("{}", game.get_board());
 
         if white_score > black_score {
@@ -63,8 +64,9 @@ pub fn run() {
                     "1) Move\n",
                     "2) Previous\n",
                     "3) Next\n",
-                    "4) Resign\n",
-                    "5) Quit\n"
+                    "4) Offer Draw\n",
+                    "5) Resign\n",
+                    "6) Quit\n"
                 ));
 
                 println!("Enter choice: ");
@@ -100,6 +102,29 @@ pub fn run() {
                     }
                     game_options::NEXT_OPTION => {
                         game.next();
+                    }
+                    game_options::DRAW_OPTION => {
+                        println!("Your opponent has offered a draw, do you accept (Y/n):");
+
+                        let mut response = String::new();
+                        std::io::stdin()
+                            .read_line(&mut response)
+                            .expect("Failed to read stdin.");
+                        let response = response.to_lowercase();
+                        let response = response.trim();
+
+                        match response {
+                            "y" => {
+                                println!("Your opponent has accepted the draw, game over.\n");
+                                game_over = true;
+                            }
+
+                            "n" => {
+                                println!("Your opponent has rejected the draw.\n");
+                            }
+
+                            _ => (),
+                        }
                     }
                     game_options::RESIGN_OPTION => {
                         let winning_side = match game.get_board().get_current_turn() {

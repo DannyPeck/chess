@@ -225,8 +225,7 @@ pub fn get_piece_moves(
                     "Unable to find a piece for the current player at the provided position.",
                 ))
             }
-                
-        },
+        }
         None => Err(MoveError::new("No piece found at the provided position.")),
     }
 }
@@ -639,7 +638,7 @@ pub fn is_en_passant_target(board: &Board, position: &Position) -> bool {
 }
 
 pub fn possible_en_passant_capture(board: &Board) -> bool {
-     match board.get_en_passant_target() {
+    match board.get_en_passant_target() {
         Some(target) => {
             let left_diagonal = match board.get_current_turn() {
                 Side::White => Position::from_file_and_rank(target.file() - 1, target.rank() - 1),
@@ -664,8 +663,8 @@ pub fn possible_en_passant_capture(board: &Board) -> bool {
             }
 
             valid_capture
-        },
-        None => false
+        }
+        None => false,
     }
 }
 

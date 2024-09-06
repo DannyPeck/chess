@@ -150,7 +150,7 @@ impl Board {
             positions: self.positions.clone(),
             current_turn: self.current_turn.clone(),
             castle_rights: self.castle_rights.clone(),
-            en_passant_capture
+            en_passant_capture,
         }
     }
 
