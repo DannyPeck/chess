@@ -5,7 +5,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Game {
-    pub board: Board,
+    board: Board,
     index: usize,
     history: Vec<String>,
 }
@@ -44,6 +44,10 @@ impl Game {
         } else {
             false
         }
+    }
+
+    pub fn get_board(&self) -> &Board {
+        &self.board
     }
 
     pub fn attempt_move(&mut self, request: MoveRequest) -> Result<(), MoveError> {

@@ -3,8 +3,9 @@ pub mod fen;
 pub mod game;
 pub mod piece;
 
-use board::{Board, MoveRequest};
+use board::{Board, MoveRequest, MoveState};
 use game::Game;
+use piece::Side;
 
 #[derive(Debug)]
 pub struct ParseError(String);
@@ -15,29 +16,147 @@ impl ParseError {
     }
 }
 
+pub mod game_options {
+    pub const MOVE_OPTION: &str = "1";
+    pub const PREVIOUS_OPTION: &str = "2";
+    pub const NEXT_OPTION: &str = "3";
+    pub const RESIGN_OPTION: &str = "4";
+    pub const QUIT_OPTION: &str = "5";
+}
+
+pub mod post_game_options {
+    pub const NEW_GAME_OPTION: &str = "1";
+    pub const PREVIOUS_OPTION: &str = "2";
+    pub const NEXT_OPTION: &str = "3";
+    pub const QUIT_OPTION: &str = "4";
+}
+
 pub fn run() {
-    let board = Board::default();
-    let mut game = Game::new(board);
+    let mut game = Game::new(Board::default());
 
-    let moves = vec![
-        MoveRequest::from_coordinate("e2e3").unwrap(),
-        MoveRequest::from_coordinate("f7f6").unwrap(),
-        MoveRequest::from_coordinate("f2f4").unwrap(),
-        MoveRequest::from_coordinate("g7g5").unwrap(),
-        MoveRequest::from_coordinate("d1h5").unwrap(),
-    ];
+    let mut keep_going = true;
+    while keep_going {
+        println!("{}\n", game.get_board());
 
-    perform_moves(&mut game, moves);
+        let move_state = board::get_move_state(game.get_board());
+
+        let mut game_over = false;
+        match move_state {
+            MoveState::CanMove | MoveState::Check => {
+                println!(concat!(
+                    "Select one of the following options:\n",
+                    "1) Move\n",
+                    "2) Previous\n",
+                    "3) Next\n",
+                    "4) Resign\n",
+                    "5) Quit\n"
+                ));
+
+                println!("Enter choice: ");
+
+                let mut option = String::new();
+                std::io::stdin()
+                    .read_line(&mut option)
+                    .expect("Failed to read stdin.");
+                let option = option.trim();
+
+                match option {
+                    game_options::MOVE_OPTION => {
+                        let mut coordinates = String::new();
+
+                        println!("Enter move: ");
+
+                        std::io::stdin()
+                            .read_line(&mut coordinates)
+                            .expect("Failed to read stdin.");
+
+                        let coordinates = coordinates.trim();
+
+                        if let Ok(request) = MoveRequest::from_coordinate(coordinates) {
+                            if let Err(error) = game.attempt_move(request) {
+                                println!("Move Error: {}", error);
+                            }
+                        }
+
+                        println!("");
+                    }
+                    game_options::PREVIOUS_OPTION => {
+                        game.previous();
+                    }
+                    game_options::NEXT_OPTION => {
+                        game.next();
+                    }
+                    game_options::RESIGN_OPTION => {
+                        let winning_side = match game.get_board().get_current_turn() {
+                            Side::White => "black",
+                            Side::Black => "white",
+                        };
+                        println!("Player resigned, {winning_side} won!\n");
+
+                        game_over = true;
+                    }
+                    game_options::QUIT_OPTION => keep_going = false,
+                    _ => (),
+                }
+            }
+            MoveState::Stalemate => {
+                println!("The game has ended in a stalemate.\n");
+
+                game_over = true;
+            }
+            MoveState::Checkmate => {
+                let winning_side = match game.get_board().get_current_turn() {
+                    Side::White => "black",
+                    Side::Black => "white",
+                };
+                println!("Checkmate, {winning_side} won!\n");
+
+                game_over = true;
+            }
+        }
+
+        if game_over {
+            println!(concat!(
+                "Select one of the following options:\n",
+                "1) New game\n",
+                "2) Previous\n",
+                "3) Next\n",
+                "4) Quit\n"
+            ));
+
+            println!("Enter choice: ");
+
+            let mut option = String::new();
+            std::io::stdin()
+                .read_line(&mut option)
+                .expect("Failed to read stdin.");
+            let option = option.trim();
+
+            match option {
+                post_game_options::NEW_GAME_OPTION => {
+                    game = Game::new(Board::default());
+                }
+                post_game_options::PREVIOUS_OPTION => {
+                    game.previous();
+                }
+                post_game_options::NEXT_OPTION => {
+                    game.next();
+                }
+                post_game_options::QUIT_OPTION => keep_going = false,
+                _ => (),
+            }
+        }
+    }
 }
 
 pub fn perform_moves(game: &mut Game, move_requests: Vec<MoveRequest>) {
-    println!("{}\n", game.board);
+    println!("{}\n", game.get_board());
 
     for request in move_requests {
         match game.attempt_move(request) {
             Ok(_) => {
-                println!("{}\n", game.board);
-                println!("{:?}\n", board::get_move_state(&game.board));
+                println!("{}\n", game.get_board());
+                println!("{:?}\n", board::get_move_state(game.get_board()));
             }
             Err(error) => {
                 println!("{error:?}");

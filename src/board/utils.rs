@@ -25,6 +25,12 @@ impl MoveError {
     }
 }
 
+impl std::fmt::Display for MoveError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum MoveKind {
     Move,
