@@ -1,5 +1,5 @@
 mod generate;
 mod parse;
 
-pub use generate::generate_fen;
-pub use parse::{parse_fen, ParseError};
+pub use generate::generate;
+pub use parse::{parse, ParseError};

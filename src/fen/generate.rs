@@ -3,7 +3,7 @@ use crate::{
     piece::Side,
 };
 
-pub fn generate_fen(board: &Board) -> String {
+pub fn generate(board: &Board) -> String {
     let piece_placement = generate_piece_placement(board);
     let active_color = generate_active_color(&board.get_current_turn());
     let castling_availability = generate_castling_availability(board.get_castle_rights());
@@ -101,15 +101,15 @@ mod tests {
     use crate::fen::{self, ParseError};
 
     #[test]
-    fn generate_fen_test() -> Result<(), ParseError> {
+    fn generate_test() -> Result<(), ParseError> {
         assert_eq!(
-            generate_fen(&Board::default()),
+            generate(&Board::default()),
             "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
         );
 
         let custom_fen = "rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3 0 6";
-        let custom_board = fen::parse_fen(&custom_fen)?;
-        let generated_fen = generate_fen(&custom_board);
+        let custom_board = fen::parse(&custom_fen)?;
+        let generated_fen = generate(&custom_board);
         assert_eq!(generated_fen, custom_fen);
 
         Ok(())
@@ -123,7 +123,7 @@ mod tests {
         );
 
         let custom_fen = "rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3 0 6";
-        let custom_board = fen::parse_fen(&custom_fen)?;
+        let custom_board = fen::parse(&custom_fen)?;
 
         let expected_piece_placement = "rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R";
         let generated_piece_placement = generate_piece_placement(&custom_board);

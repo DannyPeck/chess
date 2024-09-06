@@ -12,7 +12,7 @@ impl ParseError {
     }
 }
 
-pub fn parse_fen(fen: &str) -> Result<Board, ParseError> {
+pub fn parse(fen: &str) -> Result<Board, ParseError> {
     let mut fen_iter = fen.split(' ');
 
     let piece_placement = fen_iter
@@ -181,9 +181,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_fen_valid() -> Result<(), ParseError> {
-        let board =
-            parse_fen("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3 0 6")?;
+    fn parse_valid() -> Result<(), ParseError> {
+        let board = parse("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3 0 6")?;
 
         let position_tests: Vec<(Position, Option<Piece>)> = vec![
             board_position!(a1, None),
@@ -253,7 +252,7 @@ mod tests {
         ];
 
         for (position, piece) in position_tests {
-            assert_eq!(board.get_piece(&position), &piece);
+            assert_eq!(board.get_piece(&position), piece.as_ref());
         }
 
         assert_eq!(*board.get_current_turn(), Side::Black);
@@ -273,28 +272,26 @@ mod tests {
     }
 
     #[test]
-    fn parse_fen_invalid() -> Result<(), ParseError> {
+    fn parse_invalid() -> Result<(), ParseError> {
         // Missing full moves
         assert!(
-            parse_fen("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3 0").is_err()
+            parse("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3 0").is_err()
         );
 
         // Missing half moves
-        assert!(
-            parse_fen("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3").is_err()
-        );
+        assert!(parse("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3").is_err());
 
         // Missing en passant target
-        assert!(parse_fen("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq").is_err());
+        assert!(parse("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq").is_err());
 
         // Missing castling availability
-        assert!(parse_fen("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b").is_err());
+        assert!(parse("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b").is_err());
 
         // Missing active color
-        assert!(parse_fen("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R").is_err());
+        assert!(parse("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R").is_err());
 
         // Empty
-        assert!(parse_fen("").is_err());
+        assert!(parse("").is_err());
 
         Ok(())
     }
@@ -376,7 +373,7 @@ mod tests {
         ];
 
         for (position, piece) in position_tests {
-            assert_eq!(board.get_piece(&position), &piece);
+            assert_eq!(board.get_piece(&position), piece.as_ref());
         }
 
         Ok(())

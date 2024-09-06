@@ -1,14 +1,459 @@
 use std::collections::HashMap;
 
-use crate::board::position::{Offset, Position};
+use crate::{
+    board::position::{Offset, Position},
+    piece::{Piece, PieceType, PromotionType, Side},
+};
 
-use super::MoveKind;
+use super::{rank, Board};
 
-pub fn get_if_valid<F>(position: &Position, offset: &Offset, filter: F) -> Option<Position>
-where
-    F: Fn(&Position) -> bool,
-{
-    Position::from_offset(&position, offset).filter(filter)
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum MoveState {
+    CanMove,
+    Stalemate,
+    Check,
+    Checkmate,
+}
+
+#[derive(Debug)]
+pub struct MoveError(String);
+
+impl MoveError {
+    pub fn new(error: &str) -> MoveError {
+        MoveError(String::from(error))
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum MoveKind {
+    Move,
+    DoubleMove(Position), //  en passant target position
+    Capture,
+    EnPassant(Position), // capture position
+    ShortCastle,
+    LongCastle,
+    Promotion(bool), // capture
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct MoveRequest {
+    pub start: Position,
+    pub end: Position,
+    pub promotion: Option<PromotionType>,
+}
+
+impl MoveRequest {
+    pub fn new(start: Position, end: Position) -> MoveRequest {
+        MoveRequest {
+            start,
+            end,
+            promotion: None,
+        }
+    }
+
+    pub fn promotion(start: Position, end: Position, promotion_type: PromotionType) -> MoveRequest {
+        MoveRequest {
+            start,
+            end,
+            promotion: Some(promotion_type),
+        }
+    }
+}
+
+pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<(), MoveError> {
+    let move_kind = get_move(board, &request)?;
+
+    // Always take the piece from the start square.
+    let moving_piece = board.take_piece(&request.start).unwrap();
+
+    // Special handling for en passant because the position of the captured piece is not on the end position.
+    // Note that this must happen before we update the en passant target.
+    if let MoveKind::EnPassant(en_passant_capture) = &move_kind {
+        board.set_position(&en_passant_capture, None);
+    }
+
+    // Set the en passant target
+    if let MoveKind::DoubleMove(en_passant_target) = &move_kind {
+        board.en_passant_target = Some(en_passant_target.clone());
+    } else {
+        board.en_passant_target = None;
+    }
+
+    // Handle castling
+    match (&moving_piece.piece_type, &moving_piece.side) {
+        (PieceType::Rook, Side::White) => {
+            if request.start == Position::a1() {
+                board.castle_rights.white_long_castle_rights = false;
+            } else if request.start == Position::h1() {
+                board.castle_rights.white_short_castle_rights = false;
+            }
+        }
+        (PieceType::Rook, Side::Black) => {
+            if request.start == Position::a8() {
+                board.castle_rights.black_long_castle_rights = false;
+            } else if request.start == Position::h8() {
+                board.castle_rights.black_short_castle_rights = false;
+            }
+        }
+        (PieceType::King, Side::White) => {
+            board.castle_rights.white_long_castle_rights = false;
+            board.castle_rights.white_short_castle_rights = false;
+
+            match &move_kind {
+                MoveKind::ShortCastle => {
+                    let rook = board.take_piece(&Position::h1()).unwrap();
+                    board.set_position(&Position::f1(), Some(rook));
+                }
+                MoveKind::LongCastle => {
+                    let rook = board.take_piece(&Position::a1()).unwrap();
+                    board.set_position(&Position::d1(), Some(rook));
+                }
+                _ => (),
+            }
+        }
+        (PieceType::King, Side::Black) => {
+            board.castle_rights.black_long_castle_rights = false;
+            board.castle_rights.black_short_castle_rights = false;
+
+            match &move_kind {
+                MoveKind::ShortCastle => {
+                    let rook = board.take_piece(&Position::h8()).unwrap();
+                    board.set_position(&Position::f8(), Some(rook));
+                }
+                MoveKind::LongCastle => {
+                    let rook = board.take_piece(&Position::a8()).unwrap();
+                    board.set_position(&Position::d8(), Some(rook));
+                }
+                _ => (),
+            }
+        }
+        _ => (),
+    }
+
+    // Update the have move counter
+    let is_pawn_move = moving_piece.piece_type == PieceType::Pawn;
+    let is_capture = match move_kind {
+        MoveKind::Capture | MoveKind::EnPassant(_) | MoveKind::Promotion(true) => true,
+        _ => false,
+    };
+
+    let reset_half_moves = is_pawn_move || is_capture;
+    if reset_half_moves {
+        board.half_moves = 0;
+    } else {
+        board.half_moves += 1;
+    }
+
+    let piece = match move_kind {
+        MoveKind::Promotion(_) => {
+            // We would not get the MoveKind promotion if it was an invalid request.
+            let promotion_piece_type = request.promotion.unwrap().to_piece_type();
+            Piece::new(promotion_piece_type, board.get_current_turn().clone())
+        },
+        _ => moving_piece,
+    };
+
+    // Place the piece on it's destination square.
+    board.set_position(&request.end, Some(piece));
+
+    board.change_turn();
+
+    Ok(())
+}
+
+pub fn get_move(board: &Board, request: &MoveRequest) -> Result<MoveKind, MoveError> {
+    let piece = board
+        .get_piece(&request.start)
+        .filter(|piece| piece.side == *board.get_current_turn())
+        .ok_or(MoveError::new(
+            "Unable to find a piece for the current player at the provided position.",
+        ))?;
+
+    let moves = get_piece_moves(board, &piece, &request.start);
+    let move_kind = moves
+        .get(&request.end)
+        .ok_or(MoveError::new("Provided move is not valid."))?;
+
+    if let (MoveKind::Promotion(_), None) = (move_kind, &request.promotion) {
+        return Err(MoveError::new(
+            "Invalid move request, missing promotion data.",
+        ));
+    }
+
+    Ok(move_kind.clone())
+}
+
+pub fn get_piece_moves(
+    board: &Board,
+    piece: &Piece,
+    start: &Position,
+) -> HashMap<Position, MoveKind> {
+    match piece.piece_type {
+        PieceType::Pawn => get_pawn_moves(board, start, &piece.side),
+        PieceType::Rook => get_rook_moves(board, start, &piece.side),
+        PieceType::Knight => get_knight_moves(board, start, &piece.side),
+        PieceType::Bishop => get_bishop_moves(board, start, &piece.side),
+        PieceType::King => get_king_moves(board, start, &piece.side),
+        PieceType::Queen => get_queen_moves(board, start, &piece.side),
+    }
+}
+
+pub fn get_pawn_moves(board: &Board, start: &Position, side: &Side) -> HashMap<Position, MoveKind> {
+    let mut valid_positions = HashMap::new();
+
+    let forward_one = match side {
+        Side::White => Offset::new(0, 1),
+        Side::Black => Offset::new(0, -1),
+    };
+
+    let left_diagonal = match side {
+        Side::White => Offset::new(-1, 1),
+        Side::Black => Offset::new(1, -1),
+    };
+
+    let right_diagonal = match side {
+        Side::White => Offset::new(1, 1),
+        Side::Black => Offset::new(-1, -1),
+    };
+
+    let promotion_rank = match side {
+        Side::White => rank::EIGHT,
+        Side::Black => rank::ONE,
+    };
+
+    if let Some(new_position) = Position::from_offset(&start, &forward_one) {
+        if !contains_piece(board, &new_position) {
+            let move_kind = if new_position.rank() == promotion_rank {
+                MoveKind::Promotion(false)
+            } else {
+                MoveKind::Move
+            };
+            valid_positions.insert(new_position, move_kind);
+        }
+    }
+
+    let double_move_positions = match side {
+        Side::White if start.rank() == rank::TWO => {
+            let forward_one = Position::from_file_and_rank(start.file(), start.rank() + 1);
+            let forward_two = Position::from_file_and_rank(start.file(), start.rank() + 2);
+            Some((forward_one, forward_two))
+        }
+        Side::Black if start.rank() == rank::SEVEN => {
+            let forward_one = Position::from_file_and_rank(start.file(), start.rank() - 1);
+            let forward_two = Position::from_file_and_rank(start.file(), start.rank() - 2);
+            Some((forward_one, forward_two))
+        }
+        _ => None,
+    };
+
+    if let Some((forward_one, forward_two)) = double_move_positions {
+        let forward_one_empty = !contains_piece(board, &forward_one);
+        let forward_two_empty = !contains_piece(board, &forward_two);
+
+        if forward_one_empty && forward_two_empty {
+            valid_positions.insert(forward_two, MoveKind::DoubleMove(forward_one));
+        }
+    }
+
+    let en_passant_move = |new_position: &Position| {
+        let en_passant_target = match side {
+            Side::White => {
+                Position::from_file_and_rank(new_position.file(), new_position.rank() - 1)
+            }
+            Side::Black => {
+                Position::from_file_and_rank(new_position.file(), new_position.rank() + 1)
+            }
+        };
+
+        if is_en_passant_target(board, &en_passant_target) {
+            Some(en_passant_target)
+        } else {
+            None
+        }
+    };
+
+    let diagonal_moves = vec![left_diagonal, right_diagonal];
+    for diagonal_move in diagonal_moves {
+        if let Some(new_position) = Position::from_offset(&start, &diagonal_move) {
+            if contains_enemy_piece(board, &new_position, side) {
+                let move_kind = if new_position.rank() == promotion_rank {
+                    MoveKind::Promotion(true)
+                } else {
+                    MoveKind::Capture
+                };
+                valid_positions.insert(new_position, move_kind);
+            } else if let Some(en_passant_capture) = en_passant_move(&new_position) {
+                valid_positions.insert(new_position, MoveKind::EnPassant(en_passant_capture));
+            }
+        }
+    }
+
+    return valid_positions;
+}
+
+pub fn get_knight_moves(
+    board: &Board,
+    start: &Position,
+    side: &Side,
+) -> HashMap<Position, MoveKind> {
+    let mut valid_positions = HashMap::new();
+
+    let offsets = vec![
+        // North East
+        Offset::new(1, 2),
+        Offset::new(2, 1),
+        // South East
+        Offset::new(1, -2),
+        Offset::new(2, -1),
+        // North West
+        Offset::new(-1, 2),
+        Offset::new(-2, 1),
+        // South West
+        Offset::new(-2, -1),
+        Offset::new(-1, -2),
+    ];
+
+    for offset in offsets {
+        if let Some(new_position) = Position::from_offset(start, &offset) {
+            if contains_enemy_piece(board, &new_position, side) {
+                valid_positions.insert(new_position, MoveKind::Capture);
+            } else if !contains_piece(board, &new_position) {
+                valid_positions.insert(new_position, MoveKind::Move);
+            }
+        }
+    }
+
+    return valid_positions;
+}
+
+pub fn get_rook_moves(board: &Board, start: &Position, side: &Side) -> HashMap<Position, MoveKind> {
+    let offsets = vec![
+        Offset::new(1, 0),
+        Offset::new(0, 1),
+        Offset::new(-1, 0),
+        Offset::new(0, -1),
+    ];
+
+    get_while_valid(board, start, side, &offsets)
+}
+
+pub fn get_bishop_moves(
+    board: &Board,
+    start: &Position,
+    side: &Side,
+) -> HashMap<Position, MoveKind> {
+    let offsets = vec![
+        Offset::new(1, 1),
+        Offset::new(-1, 1),
+        Offset::new(1, -1),
+        Offset::new(-1, -1),
+    ];
+    get_while_valid(board, start, side, &offsets)
+}
+
+pub fn get_queen_moves(
+    board: &Board,
+    start: &Position,
+    side: &Side,
+) -> HashMap<Position, MoveKind> {
+    let offsets = vec![
+        Offset::new(1, 0),
+        Offset::new(0, 1),
+        Offset::new(-1, 0),
+        Offset::new(0, -1),
+        Offset::new(1, 1),
+        Offset::new(-1, 1),
+        Offset::new(1, -1),
+        Offset::new(-1, -1),
+    ];
+    get_while_valid(board, start, side, &offsets)
+}
+
+pub fn get_king_moves(board: &Board, start: &Position, side: &Side) -> HashMap<Position, MoveKind> {
+    let mut valid_positions = HashMap::new();
+
+    // Regular moves
+    let offsets = vec![
+        Offset::new(1, 0),
+        Offset::new(0, 1),
+        Offset::new(-1, 0),
+        Offset::new(0, -1),
+        Offset::new(1, 1),
+        Offset::new(-1, 1),
+        Offset::new(1, -1),
+        Offset::new(-1, -1),
+    ];
+
+    for offset in offsets {
+        if let Some(new_position) = Position::from_offset(start, &offset) {
+            if contains_enemy_piece(board, &new_position, side) {
+                valid_positions.insert(new_position, MoveKind::Capture);
+            } else if !contains_piece(board, &new_position) {
+                valid_positions.insert(new_position, MoveKind::Move);
+            }
+        }
+    }
+
+    // Castling
+    match side {
+        Side::White => {
+            if board.castle_rights.white_short_castle_rights {
+                let castle_positions = vec![Position::f1(), Position::g1()];
+                if are_positions_empty(board, &castle_positions) {
+                    valid_positions.insert(Position::g1(), MoveKind::ShortCastle);
+                }
+            }
+
+            if board.castle_rights.white_long_castle_rights {
+                let castle_positions = vec![Position::b1(), Position::c1(), Position::d1()];
+                if are_positions_empty(board, &castle_positions) {
+                    valid_positions.insert(Position::c1(), MoveKind::LongCastle);
+                }
+            }
+        }
+        Side::Black => {
+            if board.castle_rights.black_short_castle_rights {
+                let castle_positions = vec![Position::f8(), Position::g8()];
+                if are_positions_empty(board, &castle_positions) {
+                    valid_positions.insert(Position::g8(), MoveKind::ShortCastle);
+                }
+            }
+
+            if board.castle_rights.black_long_castle_rights {
+                let castle_positions = vec![Position::b8(), Position::c8(), Position::d8()];
+                if are_positions_empty(board, &castle_positions) {
+                    valid_positions.insert(Position::c8(), MoveKind::LongCastle);
+                }
+            }
+        }
+    }
+
+    return valid_positions;
+}
+
+pub fn get_while_valid(
+    board: &Board,
+    position: &Position,
+    side: &Side,
+    offsets: &Vec<Offset>,
+) -> HashMap<Position, MoveKind> {
+    let mut valid_positions = HashMap::new();
+
+    let filter = |new_position: &Position| {
+        if !contains_piece(board, &new_position) {
+            WhileMoveResult::Continue
+        } else if contains_enemy_piece(board, &new_position, side) {
+            WhileMoveResult::Capture
+        } else {
+            WhileMoveResult::Stop
+        }
+    };
+
+    for offset in offsets {
+        add_while_valid(position, offset, filter, &mut valid_positions);
+    }
+
+    valid_positions
 }
 
 pub enum WhileMoveResult {
@@ -49,21 +494,115 @@ pub fn add_while_valid<F>(
     }
 }
 
-pub fn positions_to_string(positions: &HashMap<Position, MoveKind>) -> String {
-    let mut output = String::new();
+pub fn get_all_moves(board: &Board, side: &Side) -> HashMap<Position, HashMap<Position, MoveKind>> {
+    let mut all_moves: HashMap<Position, HashMap<Position, MoveKind>> = HashMap::new();
 
-    let mut counter = 0;
-    for (position, _) in positions {
-        if counter > 0 {
-            output += ", ";
-        }
+    let piece_positions = match side {
+        Side::White => board.get_white_positions(),
+        Side::Black => board.get_black_positions(),
+    };
 
-        output += position.to_string().as_str();
-
-        counter += 1;
+    for position in piece_positions {
+        let piece = board.get_piece(position).unwrap();
+        let moves = get_piece_moves(board, &piece, position);
+        all_moves.insert(position.clone(), moves);
     }
 
-    output
+    all_moves
+}
+
+pub fn is_in_check(board: &Board, side: &Side) -> bool {
+    let opponent_side = match side {
+        Side::White => Side::Black,
+        Side::Black => Side::White,
+    };
+
+    let all_opponent_moves = get_all_moves(board, &opponent_side);
+
+    for (_, piece_moves) in all_opponent_moves {
+        for (end, _) in piece_moves {
+            if board.get_piece(&end) == Some(&Piece::new(PieceType::King, side.clone())) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+pub fn get_move_state(board: &Board) -> MoveState {
+    let all_legal_moves = get_all_legal_moves(board);
+
+    if all_legal_moves.is_empty() {
+        if is_in_check(board, board.get_current_turn()) {
+            MoveState::Checkmate
+        } else {
+            MoveState::Stalemate
+        }
+    } else {
+        if board.get_half_moves() == 100 {
+            MoveState::Stalemate
+        } else if is_in_check(board, board.get_current_turn()) {
+            MoveState::Check
+        } else {
+            MoveState::CanMove
+        }
+    }
+}
+
+pub fn get_all_legal_moves(board: &Board) -> HashMap<Position, HashMap<Position, MoveKind>> {
+    let mut all_legal_moves = HashMap::new();
+    let current_side = board.get_current_turn();
+    let all_moves = get_all_moves(board, current_side);
+    for (start, piece_moves) in all_moves {
+        let mut legal_piece_moves = HashMap::new();
+        for (end, move_kind) in piece_moves {
+            let move_request = MoveRequest::new(start.clone(), end.clone());
+
+            let mut new_board = board.clone();
+            if let Ok(_) = move_piece(&mut new_board, move_request) {
+                if !is_in_check(&new_board, current_side) {
+                    legal_piece_moves.insert(end, move_kind);
+                }
+            }
+        }
+
+        if !legal_piece_moves.is_empty() {
+            all_legal_moves.insert(start, legal_piece_moves);
+        }
+    }
+
+    all_legal_moves
+}
+
+pub fn contains_piece(board: &Board, position: &Position) -> bool {
+    board.get_piece(position).is_some()
+}
+
+pub fn contains_enemy_piece(board: &Board, position: &Position, side: &Side) -> bool {
+    match board.get_piece(position) {
+        Some(piece) => piece.side != *side,
+        None => false,
+    }
+}
+
+pub fn are_positions_empty(board: &Board, positions: &Vec<Position>) -> bool {
+    let mut empty = true;
+    for position in positions {
+        if contains_piece(board, position) {
+            empty = false;
+            break;
+        }
+    }
+
+    empty
+}
+
+pub fn is_en_passant_target(board: &Board, position: &Position) -> bool {
+    match board.get_en_passant_target() {
+        Some(en_passant_target) => position == en_passant_target,
+        None => false,
+    }
 }
 
 #[macro_export]
@@ -88,4 +627,1145 @@ macro_rules! piece_position {
             Piece::new(PieceType::$piece_type, Side::$side),
         )
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::fen::{self, ParseError};
+
+    use super::*;
+
+    #[test]
+    fn move_request_test() {
+        // Normal move request
+        {
+            let move_request = MoveRequest::new(Position::a2(), Position::a3());
+            let expected_move_request = MoveRequest {
+                start: Position::a2(),
+                end: Position::a3(),
+                promotion: None,
+            };
+            assert_eq!(move_request, expected_move_request);
+        }
+
+        // Promotion move request
+        {
+            let move_request = MoveRequest::promotion(Position::a7(), Position::a8(), PromotionType::Queen);
+            let expected_move_request = MoveRequest {
+                start: Position::a7(),
+                end: Position::a8(),
+                promotion: Some(PromotionType::Queen),
+            };
+            assert_eq!(move_request, expected_move_request);
+        }
+    }
+
+    #[test]
+    fn get_pawn_moves_white() -> Result<(), ParseError> {
+        // White starting line
+        {
+            let board = Board::default();
+            let moves = get_pawn_moves(&board, &Position::f2(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::f3(), MoveKind::Move),
+                (Position::f4(), MoveKind::DoubleMove(Position::f3())),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White single move
+        {
+            let board = fen::parse("rnbqkbnr/ppp1pppp/3p4/8/8/3P4/PPP1PPPP/RNBQKBNR w KQkq - 0 2")?;
+            let moves = get_pawn_moves(&board, &Position::d3(), &Side::White);
+            let expected_moves = HashMap::from([(Position::d4(), MoveKind::Move)]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White right diagonal captures
+        {
+            let board =
+                fen::parse("rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2")?;
+            let moves = get_pawn_moves(&board, &Position::d4(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d5(), MoveKind::Move),
+                (Position::e5(), MoveKind::Capture),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White left diagonal captures
+        {
+            let board =
+                fen::parse("rnbqkbnr/pp1ppppp/8/2p5/3P4/8/PPP1PPPP/RNBQKBNR w KQkq c6 0 2")?;
+            let moves = get_pawn_moves(&board, &Position::d4(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d5(), MoveKind::Move),
+                (Position::c5(), MoveKind::Capture),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White can't move
+        {
+            let board =
+                fen::parse("rnbqkbnr/pp1ppppp/8/3P4/8/P1p5/1PP1PPPP/RNBQKBNR w KQkq - 0 4")?;
+            let moves = get_pawn_moves(&board, &Position::c2(), &Side::White);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White en passant left
+        {
+            let board =
+                fen::parse("rnbqkbnr/1p1ppppp/3P4/p1p5/8/8/PPP1PPPP/RNBQKBNR w KQkq c6 0 4")?;
+            let moves = get_pawn_moves(&board, &Position::d6(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::c7(), MoveKind::EnPassant(Position::c6())),
+                (Position::e7(), MoveKind::Capture),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White en passant right
+        {
+            let board =
+                fen::parse("rnbqkbnr/pppp1pp1/3P4/4p2p/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 4")?;
+            let moves = get_pawn_moves(&board, &Position::d6(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::e7(), MoveKind::EnPassant(Position::e6())),
+                (Position::c7(), MoveKind::Capture),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White promotion
+        {
+            let board =
+                fen::parse("rn1qkbnr/ppP1ppp1/3p3p/5b2/8/8/P1PPPPPP/RNBQKBNR w KQkq - 0 5")?;
+            let moves = get_pawn_moves(&board, &Position::c7(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::b8(), MoveKind::Promotion(true)),
+                (Position::c8(), MoveKind::Promotion(false)),
+                (Position::d8(), MoveKind::Promotion(true)),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_pawn_moves_black() -> Result<(), ParseError> {
+        // Black starting line
+        {
+            let board = Board::default();
+            let moves = get_pawn_moves(&board, &Position::f7(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::f6(), MoveKind::Move),
+                (Position::f5(), MoveKind::DoubleMove(Position::f6())),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black single move
+        {
+            let board = fen::parse("rnbqkbnr/ppp1pppp/3p4/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 2")?;
+            let moves = get_pawn_moves(&board, &Position::d6(), &Side::Black);
+            let expected_moves = HashMap::from([(Position::d5(), MoveKind::Move)]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black right diagonal captures
+        {
+            let board =
+                fen::parse("rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2")?;
+            let moves = get_pawn_moves(&board, &Position::e5(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::e4(), MoveKind::Move),
+                (Position::d4(), MoveKind::Capture),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black left diagonal captures
+        {
+            let board =
+                fen::parse("rnbqkbnr/pp1ppppp/8/2p5/3P4/8/PPP1PPPP/RNBQKBNR w KQkq c6 0 2")?;
+            let moves = get_pawn_moves(&board, &Position::c5(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d4(), MoveKind::Capture),
+                (Position::c4(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black can't move
+        {
+            let board = fen::parse("rnbqkbnr/pp1ppppp/3P4/8/2p5/8/PPP1PPPP/RNBQKBNR b KQkq - 0 3")?;
+            let moves = get_pawn_moves(&board, &Position::d7(), &Side::Black);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black en passant left
+        {
+            let board =
+                fen::parse("rnbqkbnr/ppp1pppp/7P/8/4P3/3p4/PPPP1PP1/RNBQKBNR b KQkq e3 0 4")?;
+            let moves = get_pawn_moves(&board, &Position::d3(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::e2(), MoveKind::EnPassant(Position::e3())),
+                (Position::c2(), MoveKind::Capture),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black en passant right
+        {
+            let board =
+                fen::parse("rnbqkbnr/ppp1pppp/7P/8/2P5/3p4/PP1PPPP1/RNBQKBNR b KQkq c3 0 4")?;
+            let moves = get_pawn_moves(&board, &Position::d3(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::c2(), MoveKind::EnPassant(Position::c3())),
+                (Position::e2(), MoveKind::Capture),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black promotion
+        {
+            let board = fen::parse("rnbqkbnr/p1pppppp/8/6B1/8/3P4/PPp1PPPP/RN1QKBNR b KQkq - 1 5")?;
+            let moves = get_pawn_moves(&board, &Position::c2(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::b1(), MoveKind::Promotion(true)),
+                (Position::c1(), MoveKind::Promotion(false)),
+                (Position::d1(), MoveKind::Promotion(true)),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_knight_moves_test() -> Result<(), ParseError> {
+        // All moves
+        {
+            let board =
+                fen::parse("rnbqkbnr/3ppppp/ppp5/8/4N3/3P1P2/PPP1P1PP/R1BQKBNR b KQkq - 0 4")?;
+            let moves = get_knight_moves(&board, &Position::e4(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::f6(), MoveKind::Move),
+                (Position::g5(), MoveKind::Move),
+                (Position::g3(), MoveKind::Move),
+                (Position::f2(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+                (Position::c3(), MoveKind::Move),
+                (Position::c5(), MoveKind::Move),
+                (Position::d6(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // No moves
+        {
+            let board = fen::parse("rnbqkbnr/1ppppppp/p7/8/8/P1P5/1P1PPPPP/RNBQKBNR b KQkq - 0 2")?;
+            let moves = get_knight_moves(&board, &Position::b1(), &Side::White);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Left side of board
+        {
+            let board = fen::parse("rnbqkbnr/2pppppp/pp6/8/8/N1P5/PP1PPPPP/R1BQKBNR w KQkq - 0 3")?;
+            let moves = get_knight_moves(&board, &Position::a3(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::b5(), MoveKind::Move),
+                (Position::c4(), MoveKind::Move),
+                (Position::c2(), MoveKind::Move),
+                (Position::b1(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Right side of board
+        {
+            let board = fen::parse("rnbqkbnr/pppppp2/6pp/8/8/5P1N/PPPPP1PP/RNBQKB1R w KQkq - 0 3")?;
+            let moves = get_knight_moves(&board, &Position::h3(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::g5(), MoveKind::Move),
+                (Position::f4(), MoveKind::Move),
+                (Position::f2(), MoveKind::Move),
+                (Position::g1(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Captures and own pieces
+        {
+            let board =
+                fen::parse("rnbqkbnr/p1p1ppp1/1p1p3p/8/4N3/3P4/PPP1PPPP/R1BQKBNR w KQkq - 0 4")?;
+            let moves = get_knight_moves(&board, &Position::e4(), &Side::White);
+            // No f2 because our piece is there, but still d6 because black's piece is there.
+            let expected_moves = HashMap::from([
+                (Position::f6(), MoveKind::Move),
+                (Position::g5(), MoveKind::Move),
+                (Position::g3(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+                (Position::c3(), MoveKind::Move),
+                (Position::c5(), MoveKind::Move),
+                (Position::d6(), MoveKind::Capture),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_rook_moves_test() -> Result<(), ParseError> {
+        // All directions empty to edge of board
+        {
+            let board = fen::parse("r1bqkbnr/3pppp1/P6p/2p5/1R6/2N5/2PPPPPP/2BQKBNR w Kkq - 0 9")?;
+            let moves = get_rook_moves(&board, &Position::b4(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::b1(), MoveKind::Move),
+                (Position::b2(), MoveKind::Move),
+                (Position::b3(), MoveKind::Move),
+                (Position::b5(), MoveKind::Move),
+                (Position::b6(), MoveKind::Move),
+                (Position::b7(), MoveKind::Move),
+                (Position::b8(), MoveKind::Move),
+                (Position::a4(), MoveKind::Move),
+                (Position::c4(), MoveKind::Move),
+                (Position::d4(), MoveKind::Move),
+                (Position::e4(), MoveKind::Move),
+                (Position::f4(), MoveKind::Move),
+                (Position::g4(), MoveKind::Move),
+                (Position::h4(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Captures & own pieces
+        {
+            let board =
+                fen::parse("r1bqkbnr/3ppp2/P1p3pp/8/2Rn4/1P6/2PPPPPP/1NBQKBNR w Kkq - 0 8")?;
+            let moves = get_rook_moves(&board, &Position::c4(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::a4(), MoveKind::Move),
+                (Position::b4(), MoveKind::Move),
+                (Position::d4(), MoveKind::Capture),
+                (Position::c3(), MoveKind::Move),
+                (Position::c5(), MoveKind::Move),
+                (Position::c6(), MoveKind::Capture),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // No moves
+        {
+            let board = Board::default();
+            let moves = get_rook_moves(&board, &Position::a1(), &Side::White);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_bishop_moves_test() -> Result<(), ParseError> {
+        // All directions empty to edge of board
+        {
+            let board =
+                fen::parse("rnbqkbnr/1p2pp1p/p1pp2p1/8/8/3PBP1N/PPP1P1PP/RN1QKB1R w KQkq - 0 5")?;
+            let moves = get_bishop_moves(&board, &Position::e3(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::c1(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+                (Position::f4(), MoveKind::Move),
+                (Position::g5(), MoveKind::Move),
+                (Position::h6(), MoveKind::Move),
+                (Position::a7(), MoveKind::Move),
+                (Position::b6(), MoveKind::Move),
+                (Position::c5(), MoveKind::Move),
+                (Position::d4(), MoveKind::Move),
+                (Position::f2(), MoveKind::Move),
+                (Position::g1(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Captures & own pieces
+        {
+            let board =
+                fen::parse("rnbqkbnr/1p2ppp1/p2p3p/2p5/8/3PBP2/PPP1PNPP/RN1QKB1R w KQkq - 0 6")?;
+            let moves = get_bishop_moves(&board, &Position::e3(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::c1(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+                (Position::f4(), MoveKind::Move),
+                (Position::g5(), MoveKind::Move),
+                (Position::h6(), MoveKind::Capture),
+                (Position::c5(), MoveKind::Capture),
+                (Position::d4(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // No moves
+        {
+            let board = Board::default();
+            let moves = get_bishop_moves(&board, &Position::c1(), &Side::White);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_queen_moves_test() -> Result<(), ParseError> {
+        // All directions empty to edge of board
+        {
+            let board =
+                fen::parse("r1b1kbn1/1p3p1r/p1n1p1p1/7p/3Q4/PP3P1N/R1P1P1PP/1NB1KB1R w Kq - 2 12")?;
+            let moves = get_queen_moves(&board, &Position::d4(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::a4(), MoveKind::Move),
+                (Position::b4(), MoveKind::Move),
+                (Position::c4(), MoveKind::Move),
+                (Position::e4(), MoveKind::Move),
+                (Position::f4(), MoveKind::Move),
+                (Position::g4(), MoveKind::Move),
+                (Position::h4(), MoveKind::Move),
+                (Position::d1(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+                (Position::d3(), MoveKind::Move),
+                (Position::d5(), MoveKind::Move),
+                (Position::d6(), MoveKind::Move),
+                (Position::d7(), MoveKind::Move),
+                (Position::d8(), MoveKind::Move),
+                (Position::a7(), MoveKind::Move),
+                (Position::b6(), MoveKind::Move),
+                (Position::c5(), MoveKind::Move),
+                (Position::e3(), MoveKind::Move),
+                (Position::f2(), MoveKind::Move),
+                (Position::g1(), MoveKind::Move),
+                (Position::a1(), MoveKind::Move),
+                (Position::b2(), MoveKind::Move),
+                (Position::c3(), MoveKind::Move),
+                (Position::e5(), MoveKind::Move),
+                (Position::f6(), MoveKind::Move),
+                (Position::g7(), MoveKind::Move),
+                (Position::h8(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Captures & own pieces
+        {
+            let board =
+                fen::parse("r3k1n1/3b1pbr/ppn1p1p1/7p/3Q1P2/PPP3PN/R3P2P/1NB1KB1R w Kq - 1 15")?;
+            let moves = get_queen_moves(&board, &Position::d4(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::a4(), MoveKind::Move),
+                (Position::b4(), MoveKind::Move),
+                (Position::c4(), MoveKind::Move),
+                (Position::e4(), MoveKind::Move),
+                (Position::d1(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+                (Position::d3(), MoveKind::Move),
+                (Position::d5(), MoveKind::Move),
+                (Position::d6(), MoveKind::Move),
+                (Position::d7(), MoveKind::Capture),
+                (Position::b6(), MoveKind::Capture),
+                (Position::c5(), MoveKind::Move),
+                (Position::e3(), MoveKind::Move),
+                (Position::f2(), MoveKind::Move),
+                (Position::g1(), MoveKind::Move),
+                (Position::e5(), MoveKind::Move),
+                (Position::f6(), MoveKind::Move),
+                (Position::g7(), MoveKind::Capture),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // No moves
+        {
+            let board = Board::default();
+            let moves = get_queen_moves(&board, &Position::d1(), &Side::White);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_king_moves_test() -> Result<(), ParseError> {
+        // All directions
+        {
+            let board = fen::parse("rnbqkbnr/2pppppp/4P3/1p6/3K4/p7/PPPP1PPP/RNBQ1BNR w kq - 0 7")?;
+            let moves = get_king_moves(&board, &Position::d4(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d5(), MoveKind::Move),
+                (Position::e5(), MoveKind::Move),
+                (Position::e4(), MoveKind::Move),
+                (Position::e3(), MoveKind::Move),
+                (Position::d3(), MoveKind::Move),
+                (Position::c3(), MoveKind::Move),
+                (Position::c4(), MoveKind::Move),
+                (Position::c5(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Captures & own pieces, no checks or castles
+        {
+            let board = fen::parse("rnbqkbnr/1p1pppp1/p6p/8/2pKP3/8/PPPP1PPP/RNBQ1BNR w kq - 0 5")?;
+            let moves = get_king_moves(&board, &Position::d4(), &Side::White);
+            // Still c4 as a capture, but not e4 because of our own piece
+            let expected_moves = HashMap::from([
+                (Position::d5(), MoveKind::Move),
+                (Position::e5(), MoveKind::Move),
+                (Position::e3(), MoveKind::Move),
+                (Position::d3(), MoveKind::Move),
+                (Position::c3(), MoveKind::Move),
+                (Position::c4(), MoveKind::Capture),
+                (Position::c5(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White short & long castles
+        {
+            let board =
+                fen::parse("r3k2r/ppp1pp1p/2nqbnpb/3p4/3P4/2NQBNPB/PPP1PP1P/R3K2R w KQkq - 4 8")?;
+            let moves = get_king_moves(&board, &Position::e1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d1(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+                (Position::f1(), MoveKind::Move),
+                (Position::c1(), MoveKind::LongCastle),
+                (Position::g1(), MoveKind::ShortCastle),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no long castle because rook move
+        {
+            let board =
+                fen::parse("r3k2r/ppp1ppbp/2nqbnp1/3p4/3P4/2NQBNPB/PPP1PP1P/1R2K2R w Kkq - 6 9")?;
+            let moves = get_king_moves(&board, &Position::e1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d1(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+                (Position::f1(), MoveKind::Move),
+                (Position::g1(), MoveKind::ShortCastle),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no short castle because rook move
+        {
+            let board =
+                fen::parse("r3k2r/ppp1ppbp/2nqbnp1/3p4/3P4/2NQBNPB/PPP1PP1P/R3K1R1 w Qkq - 6 9")?;
+            let moves = get_king_moves(&board, &Position::e1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d1(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+                (Position::f1(), MoveKind::Move),
+                (Position::c1(), MoveKind::LongCastle),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no castle because king move
+        {
+            let board =
+                fen::parse("r3k2r/ppp1ppbp/2nqbnp1/3p4/3P4/2NQBNPB/PPP1PP1P/R2K3R w kq - 6 9")?;
+            let moves = get_king_moves(&board, &Position::d1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d2(), MoveKind::Move),
+                (Position::c1(), MoveKind::Move),
+                (Position::e1(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no long castle because piece on b1
+        {
+            let board =
+                fen::parse("rn2kbnr/ppp1pppp/3qb3/3p4/3P4/3QB3/PPP1PPPP/RN2KBNR w KQkq - 4 4")?;
+            let moves = get_king_moves(&board, &Position::e1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d1(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no long castle because piece on c1
+        {
+            let board =
+                fen::parse("rnb1kbnr/pp2pppp/2pq4/3p4/3P4/2NQ4/PPP1PPPP/R1B1KBNR w KQkq - 0 4")?;
+            let moves = get_king_moves(&board, &Position::e1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::d1(), MoveKind::Move),
+                (Position::d2(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no long castle because piece on d1
+        {
+            let board =
+                fen::parse("rnbqkbnr/pp3ppp/2p1p3/3p4/3P4/N3B3/PPP1PPPP/R2QKBNR w KQkq - 0 4")?;
+            let moves = get_king_moves(&board, &Position::e1(), &Side::White);
+            let expected_moves = HashMap::from([(Position::d2(), MoveKind::Move)]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no short castle because piece on f1
+        {
+            let board = fen::parse("rnbqkbnr/pppppp1p/6p1/8/8/5N2/PPPPPPPP/RNBQKB1R w KQkq - 0 2")?;
+            let moves = get_king_moves(&board, &Position::e1(), &Side::White);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no short castle because piece on g1
+        {
+            let board =
+                fen::parse("rnbqkbnr/ppp2ppp/3pp3/8/8/3BP3/PPPP1PPP/RNBQK1NR w KQkq - 0 3")?;
+            let moves = get_king_moves(&board, &Position::e1(), &Side::White);
+            let expected_moves = HashMap::from([
+                (Position::e2(), MoveKind::Move),
+                (Position::f1(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // White no moves
+        {
+            let board = Board::default();
+            let moves = get_king_moves(&board, &Position::e1(), &Side::White);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black short & long castles
+        {
+            let board =
+                fen::parse("r3k2r/ppp1pp1p/2nqbnpb/3p4/3P4/2PQPPP1/PP5P/RNB1KBNR b KQkq - 0 8")?;
+            let moves = get_king_moves(&board, &Position::e8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d8(), MoveKind::Move),
+                (Position::d7(), MoveKind::Move),
+                (Position::f8(), MoveKind::Move),
+                (Position::c8(), MoveKind::LongCastle),
+                (Position::g8(), MoveKind::ShortCastle),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no long castle because rook move
+        {
+            let board =
+                fen::parse("1r2k2r/ppp1pp1p/2nqbnpb/3p4/3P1P2/2PQP1P1/PP5P/RNB1KBNR b KQk - 0 9")?;
+            let moves = get_king_moves(&board, &Position::e8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d8(), MoveKind::Move),
+                (Position::d7(), MoveKind::Move),
+                (Position::f8(), MoveKind::Move),
+                (Position::g8(), MoveKind::ShortCastle),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no short castle because rook move
+        {
+            let board =
+                fen::parse("r3k1r1/ppp1pp1p/2nqbnpb/3p4/3P2P1/2PQPP2/PP5P/RNB1KBNR b KQq - 0 9")?;
+            let moves = get_king_moves(&board, &Position::e8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d8(), MoveKind::Move),
+                (Position::d7(), MoveKind::Move),
+                (Position::f8(), MoveKind::Move),
+                (Position::c8(), MoveKind::LongCastle),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no castle because king move
+        {
+            let board =
+                fen::parse("r2k3r/ppp1pp1p/2nqbnpb/3p4/3P2P1/2PQPP2/PP5P/RNB1KBNR b KQ - 0 9")?;
+            let moves = get_king_moves(&board, &Position::d8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d7(), MoveKind::Move),
+                (Position::c8(), MoveKind::Move),
+                (Position::e8(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no long castle because piece on b8
+        {
+            let board =
+                fen::parse("rn2kbnr/ppp1pppp/3qb3/3p4/3P4/2P5/PP1QPPPP/RNB1KBNR b KQkq - 0 4")?;
+            let moves = get_king_moves(&board, &Position::e8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d8(), MoveKind::Move),
+                (Position::d7(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no long castle because piece on c8
+        {
+            let board =
+                fen::parse("r1b1kbnr/ppp1pppp/2nq4/3p4/3P4/2P1P3/PP3PPP/RNBQKBNR b KQkq - 0 4")?;
+            let moves = get_king_moves(&board, &Position::e8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::d8(), MoveKind::Move),
+                (Position::d7(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no long castle because piece on d8
+        {
+            let board =
+                fen::parse("r2qkbnr/ppp1pppp/2n5/3p1b2/3PP3/8/PPP2PPP/RNBQKBNR b KQkq - 0 4")?;
+            let moves = get_king_moves(&board, &Position::e8(), &Side::Black);
+            let expected_moves = HashMap::from([(Position::d7(), MoveKind::Move)]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no short castle because piece on f8
+        {
+            let board =
+                fen::parse("rnbqkb1r/pppppppp/7n/8/8/2N2P2/PPPPP1PP/R1BQKBNR b KQkq - 0 2")?;
+            let moves = get_king_moves(&board, &Position::e8(), &Side::Black);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no short castle because piece on g8
+        {
+            let board =
+                fen::parse("rnbqk1nr/pppp1ppp/3bp3/8/8/3PPP2/PPP3PP/RNBQKBNR b KQkq - 0 3")?;
+            let moves = get_king_moves(&board, &Position::e8(), &Side::Black);
+            let expected_moves = HashMap::from([
+                (Position::e7(), MoveKind::Move),
+                (Position::f8(), MoveKind::Move),
+            ]);
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        // Black no moves
+        {
+            let board = Board::default();
+            let moves = get_king_moves(&board, &Position::e8(), &Side::Black);
+            let expected_moves = HashMap::new();
+
+            assert_eq!(moves, expected_moves);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_all_moves_test() -> Result<(), ParseError> {
+        let board =
+            fen::parse("r3k1n1/3b1pbr/ppn1p1p1/7p/3Q1P2/PPP3PN/R3P2P/1NB1KB1R w Kq - 1 15")?;
+
+        let all_white_moves = get_all_moves(&board, &Side::White);
+
+        let expected_white_moves = HashMap::from([
+            (
+                Position::a3(),
+                HashMap::from([(Position::a4(), MoveKind::Move)]),
+            ),
+            (
+                Position::b3(),
+                HashMap::from([(Position::b4(), MoveKind::Move)]),
+            ),
+            (
+                Position::c3(),
+                HashMap::from([(Position::c4(), MoveKind::Move)]),
+            ),
+            (
+                Position::e2(),
+                HashMap::from([
+                    (Position::e3(), MoveKind::Move),
+                    (Position::e4(), MoveKind::DoubleMove(Position::e3())),
+                ]),
+            ),
+            (
+                Position::f4(),
+                HashMap::from([(Position::f5(), MoveKind::Move)]),
+            ),
+            (
+                Position::g3(),
+                HashMap::from([(Position::g4(), MoveKind::Move)]),
+            ),
+            (Position::h2(), HashMap::from([])),
+            (
+                Position::a2(),
+                HashMap::from([
+                    (Position::a1(), MoveKind::Move),
+                    (Position::b2(), MoveKind::Move),
+                    (Position::c2(), MoveKind::Move),
+                    (Position::d2(), MoveKind::Move),
+                ]),
+            ),
+            (
+                Position::b1(),
+                HashMap::from([(Position::d2(), MoveKind::Move)]),
+            ),
+            (
+                Position::c1(),
+                HashMap::from([
+                    (Position::b2(), MoveKind::Move),
+                    (Position::d2(), MoveKind::Move),
+                    (Position::e3(), MoveKind::Move),
+                ]),
+            ),
+            (
+                Position::f1(),
+                HashMap::from([(Position::g2(), MoveKind::Move)]),
+            ),
+            (
+                Position::h1(),
+                HashMap::from([(Position::g1(), MoveKind::Move)]),
+            ),
+            (
+                Position::h3(),
+                HashMap::from([
+                    (Position::g5(), MoveKind::Move),
+                    (Position::g1(), MoveKind::Move),
+                    (Position::f2(), MoveKind::Move),
+                ]),
+            ),
+            (
+                Position::e1(),
+                HashMap::from([
+                    (Position::d1(), MoveKind::Move),
+                    (Position::d2(), MoveKind::Move),
+                    (Position::f2(), MoveKind::Move),
+                ]),
+            ),
+            (
+                Position::d4(),
+                HashMap::from([
+                    (Position::a4(), MoveKind::Move),
+                    (Position::b4(), MoveKind::Move),
+                    (Position::c4(), MoveKind::Move),
+                    (Position::e4(), MoveKind::Move),
+                    (Position::d1(), MoveKind::Move),
+                    (Position::d2(), MoveKind::Move),
+                    (Position::d3(), MoveKind::Move),
+                    (Position::d5(), MoveKind::Move),
+                    (Position::d6(), MoveKind::Move),
+                    (Position::d7(), MoveKind::Capture),
+                    (Position::b6(), MoveKind::Capture),
+                    (Position::c5(), MoveKind::Move),
+                    (Position::e3(), MoveKind::Move),
+                    (Position::f2(), MoveKind::Move),
+                    (Position::g1(), MoveKind::Move),
+                    (Position::e5(), MoveKind::Move),
+                    (Position::f6(), MoveKind::Move),
+                    (Position::g7(), MoveKind::Capture),
+                ]),
+            ),
+        ]);
+
+        assert_eq!(all_white_moves, expected_white_moves);
+
+        let all_black_moves = get_all_moves(&board, &Side::Black);
+
+        let expected_black_moves = HashMap::from([
+            (
+                Position::a6(),
+                HashMap::from([(Position::a5(), MoveKind::Move)]),
+            ),
+            (
+                Position::b6(),
+                HashMap::from([(Position::b5(), MoveKind::Move)]),
+            ),
+            (
+                Position::e6(),
+                HashMap::from([(Position::e5(), MoveKind::Move)]),
+            ),
+            (
+                Position::f7(),
+                HashMap::from([
+                    (Position::f6(), MoveKind::Move),
+                    (Position::f5(), MoveKind::DoubleMove(Position::f6())),
+                ]),
+            ),
+            (
+                Position::g6(),
+                HashMap::from([(Position::g5(), MoveKind::Move)]),
+            ),
+            (
+                Position::h5(),
+                HashMap::from([(Position::h4(), MoveKind::Move)]),
+            ),
+            (
+                Position::a8(),
+                HashMap::from([
+                    (Position::a7(), MoveKind::Move),
+                    (Position::b8(), MoveKind::Move),
+                    (Position::c8(), MoveKind::Move),
+                    (Position::d8(), MoveKind::Move),
+                ]),
+            ),
+            (
+                Position::c6(),
+                HashMap::from([
+                    (Position::a7(), MoveKind::Move),
+                    (Position::b8(), MoveKind::Move),
+                    (Position::d8(), MoveKind::Move),
+                    (Position::e7(), MoveKind::Move),
+                    (Position::e5(), MoveKind::Move),
+                    (Position::d4(), MoveKind::Capture),
+                    (Position::b4(), MoveKind::Move),
+                    (Position::a5(), MoveKind::Move),
+                ]),
+            ),
+            (
+                Position::d7(),
+                HashMap::from([(Position::c8(), MoveKind::Move)]),
+            ),
+            (
+                Position::g8(),
+                HashMap::from([
+                    (Position::e7(), MoveKind::Move),
+                    (Position::f6(), MoveKind::Move),
+                    (Position::h6(), MoveKind::Move),
+                ]),
+            ),
+            (
+                Position::g7(),
+                HashMap::from([
+                    (Position::f8(), MoveKind::Move),
+                    (Position::h8(), MoveKind::Move),
+                    (Position::h6(), MoveKind::Move),
+                    (Position::f6(), MoveKind::Move),
+                    (Position::e5(), MoveKind::Move),
+                    (Position::d4(), MoveKind::Capture),
+                ]),
+            ),
+            (
+                Position::h7(),
+                HashMap::from([
+                    (Position::h8(), MoveKind::Move),
+                    (Position::h6(), MoveKind::Move),
+                ]),
+            ),
+            (
+                Position::e8(),
+                HashMap::from([
+                    (Position::f8(), MoveKind::Move),
+                    (Position::e7(), MoveKind::Move),
+                    (Position::d8(), MoveKind::Move),
+                    (Position::c8(), MoveKind::LongCastle),
+                ]),
+            ),
+        ]);
+
+        assert_eq!(all_black_moves, expected_black_moves);
+
+        Ok(())
+    }
+
+    #[test]
+    fn is_in_check_test() -> Result<(), ParseError> {
+        // White in check
+        {
+            let board =
+                fen::parse("rnb1kbnr/pp1ppppp/8/q1p5/8/3P1P2/PPP1P1PP/RNBQKBNR w KQkq - 1 3")?;
+
+            assert!(is_in_check(&board, &Side::White));
+        }
+
+        // White not in check
+        {
+            let board =
+                fen::parse("rnbqkbnr/pp1ppppp/8/2p5/8/3P1P2/PPP1P1PP/RNBQKBNR b KQkq - 0 2")?;
+
+            assert!(!is_in_check(&board, &Side::Black));
+        }
+
+        // Black in check
+        {
+            let board =
+                fen::parse("rnbqkbnr/ppppp2p/8/5ppQ/5P2/4P3/PPPP2PP/RNB1KBNR b KQkq - 1 3")?;
+
+            assert!(is_in_check(&board, &Side::Black));
+        }
+
+        // Black not in check
+        {
+            let board =
+                fen::parse("rnbqkbnr/ppppp2p/8/5pp1/5P2/4P3/PPPP2PP/RNBQKBNR w KQkq g6 0 3")?;
+
+            assert!(!is_in_check(&board, &Side::Black));
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_move_state_test() -> Result<(), ParseError> {
+        // White in checkmate
+        {
+            let board =
+                fen::parse("rnb1kbnr/pppp1ppp/4p3/8/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3")?;
+
+            assert_eq!(get_move_state(&board), MoveState::Checkmate);
+        }
+
+        // White in check
+        {
+            let board =
+                fen::parse("rnb1kbnr/pppp1ppp/4p3/8/7q/3P1P2/PPP1P1PP/RNBQKBNR w KQkq - 1 3")?;
+
+            assert_eq!(get_move_state(&board), MoveState::Check);
+        }
+
+        // White in stalemate
+        {
+            let board = fen::parse("rnb1kbnr/ppp1ppp1/8/8/8/8/4q3/6K1 w kq - 0 1")?;
+
+            assert_eq!(get_move_state(&board), MoveState::Stalemate);
+        }
+
+        // White in 50 move rule stalemate
+        {
+            let board = fen::parse("rnb1kbnr/ppppqppp/4p3/8/8/3P1P2/PPP1P1PP/RNBQKBNR w KQkq - 100 50")?;
+
+            assert_eq!(get_move_state(&board), MoveState::Stalemate);
+        }
+
+        // White not in check
+        {
+            let board =
+                fen::parse("rnb1kbnr/ppppqppp/4p3/8/8/3P1P2/PPP1P1PP/RNBQKBNR w KQkq - 1 3")?;
+
+            assert_eq!(get_move_state(&board), MoveState::CanMove);
+        }
+
+        // Black in checkmate
+        {
+            let board =
+                fen::parse("rnbqkbnr/ppppp2p/5p2/6pQ/5P2/4P3/PPPP2PP/RNB1KBNR b KQkq - 1 3")?;
+
+            assert_eq!(get_move_state(&board), MoveState::Checkmate);
+        }
+
+        // Black in check
+        {
+            let board =
+                fen::parse("rnbqkbnr/ppp1p1pp/3p1p2/7Q/5P2/4P3/PPPP2PP/RNB1KBNR b KQkq - 1 3")?;
+
+            assert_eq!(get_move_state(&board), MoveState::Check);
+        }
+
+        // Black in stalemate
+        {
+            let board = fen::parse("1R6/8/8/8/p2R4/k7/8/1K6 b - - 0 99")?;
+
+            assert_eq!(get_move_state(&board), MoveState::Stalemate);
+        }
+
+        // Black in 50 move stalemate
+        {
+            let board =
+                fen::parse("rnbqkbnr/ppp1p1pp/3p1p2/8/5P2/4PQ2/PPPP2PP/RNB1KBNR b KQkq - 100 50")?;
+
+            assert_eq!(get_move_state(&board), MoveState::Stalemate);
+        }
+
+        // Black not in check
+        {
+            let board =
+                fen::parse("rnbqkbnr/ppp1p1pp/3p1p2/8/5P2/4PQ2/PPPP2PP/RNB1KBNR b KQkq - 1 3")?;
+
+            assert_eq!(get_move_state(&board), MoveState::CanMove);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_all_legal_moves_test() -> Result<(), ParseError> {
+        let board = fen::parse("rnbqkbnr/pp1pp1pp/2p2p2/7Q/5P2/4P3/PPPP2PP/RNB1KBNR b KQkq - 1 3")?;
+
+        let all_legal_moves = get_all_legal_moves(&board);
+
+        let expected_legal_moves = HashMap::from([(
+            Position::g7(),
+            HashMap::from([(Position::g6(), MoveKind::Move)]),
+        )]);
+
+        assert_eq!(all_legal_moves, expected_legal_moves);
+
+        Ok(())
+    }
 }
