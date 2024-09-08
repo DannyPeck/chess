@@ -189,7 +189,7 @@ pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<(), MoveErr
 }
 
 pub fn get_move(board: &Board, request: &MoveRequest) -> Result<MoveKind, MoveError> {
-    let moves = get_piece_moves(board, &request.start)?;
+    let moves = get_piece_moves(board, board.get_current_turn(), &request.start)?;
     let move_kind = moves
         .get(&request.end)
         .ok_or(MoveError::new("Provided move is not valid."))?;
@@ -205,11 +205,12 @@ pub fn get_move(board: &Board, request: &MoveRequest) -> Result<MoveKind, MoveEr
 
 pub fn get_piece_moves(
     board: &Board,
+    side: &Side,
     start: &Position,
 ) -> Result<HashMap<Position, MoveKind>, MoveError> {
     match board.get_piece(start) {
         Some(piece) => {
-            if piece.side == *board.get_current_turn() {
+            if piece.side == *side {
                 let moves = match piece.piece_type {
                     PieceType::Pawn => get_pawn_moves(board, start, &piece.side),
                     PieceType::Rook => get_rook_moves(board, start, &piece.side),
@@ -535,7 +536,7 @@ pub fn get_all_moves(board: &Board, side: &Side) -> HashMap<Position, HashMap<Po
     };
 
     for position in piece_positions {
-        if let Ok(moves) = get_piece_moves(board, position) {
+        if let Ok(moves) = get_piece_moves(board, side, position) {
             all_moves.insert(position.clone(), moves);
         }
     }
@@ -651,13 +652,13 @@ pub fn possible_en_passant_capture(board: &Board) -> bool {
             };
 
             let mut valid_capture = false;
-            if let Ok(moves) = get_piece_moves(board, &left_diagonal) {
+            if let Ok(moves) = get_piece_moves(board, board.get_current_turn(), &left_diagonal) {
                 valid_capture = moves.contains_key(target);
             };
 
             // Only check the next position if we didn't already find a valid capture.
             if !valid_capture {
-                if let Ok(moves) = get_piece_moves(board, &right_diagonal) {
+                if let Ok(moves) = get_piece_moves(board, board.get_current_turn(), &right_diagonal) {
                     valid_capture = moves.contains_key(target);
                 };
             }
