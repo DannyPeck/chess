@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     board::position::{Offset, Position},
@@ -89,6 +89,34 @@ impl MoveRequest {
 
 pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<(), MoveError> {
     let move_kind = get_move(board, &request)?;
+
+    let side = board.get_current_turn();
+
+    // Filter out invalid castles that pass through check
+    if move_kind == MoveKind::ShortCastle || move_kind == MoveKind::LongCastle {
+        let opponent = side.opponent();
+        let opponent_target_positions = get_all_target_positions(board, &opponent);
+
+        let pass_through_check = match (side, &move_kind) {
+            (Side::White, MoveKind::ShortCastle) => {
+                opponent_target_positions.contains(&Position::f1())
+            }
+            (Side::White, MoveKind::LongCastle) => {
+                opponent_target_positions.contains(&Position::d1())
+            }
+            (Side::Black, MoveKind::ShortCastle) => {
+                opponent_target_positions.contains(&Position::f8())
+            }
+            (Side::Black, MoveKind::LongCastle) => {
+                opponent_target_positions.contains(&Position::d8())
+            }
+            _ => false,
+        };
+
+        if pass_through_check {
+            return Err(MoveError::new("Invalid move, cannot move through check."));
+        }
+    }
 
     // Always take the piece from the start square.
     let moving_piece = board.take_piece(&request.start).unwrap();
@@ -544,19 +572,31 @@ pub fn get_all_moves(board: &Board, side: &Side) -> HashMap<Position, HashMap<Po
     all_moves
 }
 
-pub fn is_in_check(board: &Board, side: &Side) -> bool {
-    let opponent_side = match side {
-        Side::White => Side::Black,
-        Side::Black => Side::White,
+pub fn get_all_target_positions(board: &Board, side: &Side) -> HashSet<Position> {
+    let mut all_target_positions = HashSet::new();
+
+    let piece_positions = match side {
+        Side::White => board.get_white_positions(),
+        Side::Black => board.get_black_positions(),
     };
 
-    let all_opponent_moves = get_all_moves(board, &opponent_side);
+    for position in piece_positions {
+        if let Ok(moves) = get_piece_moves(board, side, position) {
+            all_target_positions.extend(moves.into_keys());
+        }
+    }
 
-    for (_, piece_moves) in all_opponent_moves {
-        for (end, _) in piece_moves {
-            if board.get_piece(&end) == Some(&Piece::new(PieceType::King, side.clone())) {
-                return true;
-            }
+    all_target_positions
+}
+
+pub fn is_in_check(board: &Board, side: &Side) -> bool {
+    let opponent_side = side.opponent();
+
+    let all_opponent_target_positions = get_all_target_positions(board, &opponent_side);
+
+    for target_position in all_opponent_target_positions {
+        if board.get_piece(&target_position) == Some(&Piece::new(PieceType::King, side.clone())) {
+            return true;
         }
     }
 
@@ -564,7 +604,7 @@ pub fn is_in_check(board: &Board, side: &Side) -> bool {
 }
 
 pub fn get_move_state(board: &Board) -> MoveState {
-    let all_legal_moves = get_all_legal_moves(board);
+    let all_legal_moves = get_all_legal_moves(board, board.get_current_turn());
 
     if all_legal_moves.is_empty() {
         if is_in_check(board, board.get_current_turn()) {
@@ -583,25 +623,28 @@ pub fn get_move_state(board: &Board) -> MoveState {
     }
 }
 
-pub fn get_all_legal_moves(board: &Board) -> HashMap<Position, HashMap<Position, MoveKind>> {
+pub fn get_all_legal_moves(
+    board: &Board,
+    side: &Side,
+) -> HashMap<Position, HashMap<Position, MoveKind>> {
     let mut all_legal_moves = HashMap::new();
-    let current_side = board.get_current_turn();
-    let all_moves = get_all_moves(board, current_side);
-    for (start, piece_moves) in all_moves {
-        let mut legal_piece_moves = HashMap::new();
-        for (end, move_kind) in piece_moves {
+    let all_moves = get_all_moves(board, side);
+    for (start, mut piece_moves) in all_moves {
+        piece_moves.retain(|end, _| {
             let move_request = MoveRequest::new(start.clone(), end.clone());
 
+            let mut valid = false;
             let mut new_board = board.clone();
             if let Ok(_) = move_piece(&mut new_board, move_request) {
-                if !is_in_check(&new_board, current_side) {
-                    legal_piece_moves.insert(end, move_kind);
+                if !is_in_check(&new_board, side) {
+                    valid = true;
                 }
             }
-        }
 
-        if !legal_piece_moves.is_empty() {
-            all_legal_moves.insert(start, legal_piece_moves);
+            valid
+        });
+        if !piece_moves.is_empty() {
+            all_legal_moves.insert(start, piece_moves);
         }
     }
 
@@ -658,7 +701,8 @@ pub fn possible_en_passant_capture(board: &Board) -> bool {
 
             // Only check the next position if we didn't already find a valid capture.
             if !valid_capture {
-                if let Ok(moves) = get_piece_moves(board, board.get_current_turn(), &right_diagonal) {
+                if let Ok(moves) = get_piece_moves(board, board.get_current_turn(), &right_diagonal)
+                {
                     valid_capture = moves.contains_key(target);
                 };
             }
@@ -1882,16 +1926,76 @@ mod tests {
 
     #[test]
     fn get_all_legal_moves_test() -> Result<(), ParseError> {
-        let board = fen::parse("rnbqkbnr/pp1pp1pp/2p2p2/7Q/5P2/4P3/PPPP2PP/RNB1KBNR b KQkq - 1 3")?;
+        {
+            let board =
+                fen::parse("rnbqkbnr/pp1pp1pp/2p2p2/7Q/5P2/4P3/PPPP2PP/RNB1KBNR b KQkq - 1 3")?;
 
-        let all_legal_moves = get_all_legal_moves(&board);
+            let all_legal_moves = get_all_legal_moves(&board, board.get_current_turn());
 
-        let expected_legal_moves = HashMap::from([(
-            Position::g7(),
-            HashMap::from([(Position::g6(), MoveKind::Move)]),
-        )]);
+            let expected_legal_moves = HashMap::from([(
+                Position::g7(),
+                HashMap::from([(Position::g6(), MoveKind::Move)]),
+            )]);
 
-        assert_eq!(all_legal_moves, expected_legal_moves);
+            assert_eq!(all_legal_moves, expected_legal_moves);
+        }
+
+        // White no long castle because passthrough check
+        {
+            let board = fen::parse("rn2kbnr/ppp2ppp/1q1pp3/8/2B1P1b1/NP6/PBPP1PPP/R3K1NR w KQkq - 0 7")?;
+
+            let all_legal_moves = get_all_legal_moves(&board, board.get_current_turn());
+
+            // Note that long castling is not a legal move, even though white still
+            // has long castle rights and the start & end positions are not targets.
+            // It is not legal because the king passes through check on d1.
+            let king_moves = all_legal_moves.get(&Position::e1()).unwrap();
+            assert!(!king_moves.contains_key(&Position::c1()));
+            assert!(board.get_castle_rights().white_long_castle_rights);
+        }
+
+        // White no short castle because passthrough check
+        {
+            let board = fen::parse("rn2kbnr/ppp1ppp1/3p3p/8/2q1P1b1/NP3P1N/PBPP2PP/R3K2R w KQkq - 0 9")?;
+
+            let all_legal_moves = get_all_legal_moves(&board, board.get_current_turn());
+
+            // Note that long castling is not a legal move, even though white still
+            // has long castle rights and the start & end positions are not targets.
+            // It is not legal because the king passes through check on d1.
+            let king_moves = all_legal_moves.get(&Position::e1()).unwrap();
+            assert!(!king_moves.contains_key(&Position::g1()));
+            assert!(board.get_castle_rights().white_short_castle_rights);
+        }
+
+        // Black no long castle because passthrough check
+        {
+            let board = fen::parse("r3kbn1/pp2pppr/n2Q3p/P1P5/8/2P4P/P3PP1P/RNB1KBNR b KQq - 0 8")?;
+
+            let all_legal_moves = get_all_legal_moves(&board, board.get_current_turn());
+
+            // The king has no valid moves. 
+            // Note that long castling is not a legal move, even though black still
+            // has long castle rights and the start & end positions are not targets.
+            // It is not legal because the king passes through check on d8.
+            assert!(!all_legal_moves.contains_key(&Position::e8()));
+
+            assert!(board.get_castle_rights().black_long_castle_rights == true);
+        }
+
+        // Black no short castle because passthrough check
+        {
+            let board = fen::parse("rnb1k2r/ppqp1ppp/2p4n/4p3/1Q6/b1PP2PP/PP2PP2/RNB1KBNR b KQkq - 0 6")?;
+
+            let all_legal_moves = get_all_legal_moves(&board, board.get_current_turn());
+
+            // Note that long castling is not a legal move, even though black still
+            // has long castle rights and the start & end positions are not targets.
+            // It is not legal because the king passes through check on d8.
+            let king_moves = all_legal_moves.get(&Position::e8()).unwrap();
+            assert!(!king_moves.contains_key(&Position::g8()));
+            assert!(board.get_castle_rights().black_short_castle_rights);
+        }
 
         Ok(())
     }

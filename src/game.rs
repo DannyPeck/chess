@@ -61,8 +61,7 @@ impl Game {
             return Err(MoveError::new("Game is over."));
         }
 
-        let all_legal_moves = board::get_all_legal_moves(&self.board);
-        let valid_move = all_legal_moves
+        let valid_move = board::get_all_legal_moves(&self.board, self.board.get_current_turn())
             .get(&request.start)
             .map_or(false, |piece_moves| piece_moves.get(&request.end).is_some());
 

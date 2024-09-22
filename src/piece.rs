@@ -71,6 +71,13 @@ impl Side {
             _ => None,
         }
     }
+
+    pub fn opponent(&self) -> Self {
+        match self {
+            Side::White => Side::Black,
+            Side::Black => Side::White,
+        }
+    }
 }
 
 impl std::fmt::Display for Side {
