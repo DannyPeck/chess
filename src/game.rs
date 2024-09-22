@@ -25,12 +25,12 @@ impl Game {
         }
     }
 
-    pub fn next(&mut self) -> bool {
+    pub fn next_move(&mut self) -> bool {
         if self.index + 1 < self.history.len() {
             self.index += 1;
 
             let next_board = &self.history[self.index];
-            self.board = fen::parse(&next_board).unwrap();
+            self.board = fen::parse(next_board).unwrap();
 
             true
         } else {
@@ -38,12 +38,12 @@ impl Game {
         }
     }
 
-    pub fn previous(&mut self) -> bool {
+    pub fn previous_move(&mut self) -> bool {
         if self.index > 0 {
             self.index -= 1;
 
             let previous_board = &self.history[self.index];
-            self.board = fen::parse(&previous_board).unwrap();
+            self.board = fen::parse(previous_board).unwrap();
 
             true
         } else {

@@ -71,9 +71,9 @@ impl MoveRequest {
             return Err(ParseError::new("Notation is incomplete."));
         }
 
-        let start = Position::from_str(&coordinate_notation[0..2])
+        let start = Position::from_notation(&coordinate_notation[0..2])
             .ok_or(ParseError::new("Invalid start position."))?;
-        let end = Position::from_str(&coordinate_notation[2..4])
+        let end = Position::from_notation(&coordinate_notation[2..4])
             .ok_or(ParseError::new("Invalid end position."))?;
         let promotion = coordinate_notation.chars().nth(4);
 
@@ -124,7 +124,7 @@ pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<(), MoveErr
     // Special handling for en passant because the position of the captured piece is not on the end position.
     // Note that this must happen before we update the en passant target.
     if let MoveKind::EnPassant(en_passant_capture) = &move_kind {
-        board.set_position(&en_passant_capture, None);
+        board.set_position(en_passant_capture, None);
     }
 
     // Set the en passant target
@@ -187,10 +187,10 @@ pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<(), MoveErr
 
     // Update the have move counter
     let is_pawn_move = moving_piece.piece_type == PieceType::Pawn;
-    let is_capture = match move_kind {
-        MoveKind::Capture | MoveKind::EnPassant(_) | MoveKind::Promotion(true) => true,
-        _ => false,
-    };
+    let is_capture = matches!(
+        move_kind,
+        MoveKind::Capture | MoveKind::EnPassant(_) | MoveKind::Promotion(true)
+    );
 
     let reset_half_moves = is_pawn_move || is_capture;
     if reset_half_moves {
@@ -282,7 +282,7 @@ pub fn get_pawn_moves(board: &Board, start: &Position, side: &Side) -> HashMap<P
         Side::Black => rank::ONE,
     };
 
-    if let Some(new_position) = Position::from_offset(&start, &forward_one) {
+    if let Some(new_position) = Position::from_offset(start, &forward_one) {
         if !contains_piece(board, &new_position) {
             let move_kind = if new_position.rank() == promotion_rank {
                 MoveKind::Promotion(false)
@@ -335,7 +335,7 @@ pub fn get_pawn_moves(board: &Board, start: &Position, side: &Side) -> HashMap<P
 
     let diagonal_moves = vec![left_diagonal, right_diagonal];
     for diagonal_move in diagonal_moves {
-        if let Some(new_position) = Position::from_offset(&start, &diagonal_move) {
+        if let Some(new_position) = Position::from_offset(start, &diagonal_move) {
             if contains_enemy_piece(board, &new_position, side) {
                 let move_kind = if new_position.rank() == promotion_rank {
                     MoveKind::Promotion(true)
@@ -349,7 +349,7 @@ pub fn get_pawn_moves(board: &Board, start: &Position, side: &Side) -> HashMap<P
         }
     }
 
-    return valid_positions;
+    valid_positions
 }
 
 pub fn get_knight_moves(
@@ -384,7 +384,7 @@ pub fn get_knight_moves(
         }
     }
 
-    return valid_positions;
+    valid_positions
 }
 
 pub fn get_rook_moves(board: &Board, start: &Position, side: &Side) -> HashMap<Position, MoveKind> {
@@ -489,7 +489,7 @@ pub fn get_king_moves(board: &Board, start: &Position, side: &Side) -> HashMap<P
         }
     }
 
-    return valid_positions;
+    valid_positions
 }
 
 pub fn get_while_valid(
@@ -501,9 +501,9 @@ pub fn get_while_valid(
     let mut valid_positions = HashMap::new();
 
     let filter = |new_position: &Position| {
-        if !contains_piece(board, &new_position) {
+        if !contains_piece(board, new_position) {
             WhileMoveResult::Continue
-        } else if contains_enemy_piece(board, &new_position, side) {
+        } else if contains_enemy_piece(board, new_position, side) {
             WhileMoveResult::Capture
         } else {
             WhileMoveResult::Stop
@@ -537,21 +537,18 @@ pub fn add_while_valid<F>(
     }
 
     let mut current_position = start.clone();
-    loop {
-        match Position::from_offset(&current_position, offset) {
-            Some(new_position) => match filter(&new_position) {
-                WhileMoveResult::Continue => {
-                    current_position = new_position.clone();
-                    valid_positions.insert(new_position, MoveKind::Move);
-                }
-                WhileMoveResult::Capture => {
-                    valid_positions.insert(new_position, MoveKind::Capture);
-                    break;
-                }
-                WhileMoveResult::Stop => break,
-            },
-            None => break,
-        };
+    while let Some(new_position) = Position::from_offset(&current_position, offset) {
+        match filter(&new_position) {
+            WhileMoveResult::Continue => {
+                current_position = new_position.clone();
+                valid_positions.insert(new_position, MoveKind::Move);
+            }
+            WhileMoveResult::Capture => {
+                valid_positions.insert(new_position, MoveKind::Capture);
+                break;
+            }
+            WhileMoveResult::Stop => break,
+        }
     }
 }
 
@@ -612,14 +609,12 @@ pub fn get_move_state(board: &Board) -> MoveState {
         } else {
             MoveState::Stalemate
         }
+    } else if board.get_half_moves() == 100 {
+        MoveState::Stalemate
+    } else if is_in_check(board, board.get_current_turn()) {
+        MoveState::Check
     } else {
-        if board.get_half_moves() == 100 {
-            MoveState::Stalemate
-        } else if is_in_check(board, board.get_current_turn()) {
-            MoveState::Check
-        } else {
-            MoveState::CanMove
-        }
+        MoveState::CanMove
     }
 }
 
@@ -633,15 +628,8 @@ pub fn get_all_legal_moves(
         piece_moves.retain(|end, _| {
             let move_request = MoveRequest::new(start.clone(), end.clone());
 
-            let mut valid = false;
             let mut new_board = board.clone();
-            if let Ok(_) = move_piece(&mut new_board, move_request) {
-                if !is_in_check(&new_board, side) {
-                    valid = true;
-                }
-            }
-
-            valid
+            move_piece(&mut new_board, move_request).is_ok() && !is_in_check(&new_board, side)
         });
         if !piece_moves.is_empty() {
             all_legal_moves.insert(start, piece_moves);
@@ -1942,7 +1930,8 @@ mod tests {
 
         // White no long castle because passthrough check
         {
-            let board = fen::parse("rn2kbnr/ppp2ppp/1q1pp3/8/2B1P1b1/NP6/PBPP1PPP/R3K1NR w KQkq - 0 7")?;
+            let board =
+                fen::parse("rn2kbnr/ppp2ppp/1q1pp3/8/2B1P1b1/NP6/PBPP1PPP/R3K1NR w KQkq - 0 7")?;
 
             let all_legal_moves = get_all_legal_moves(&board, board.get_current_turn());
 
@@ -1956,7 +1945,8 @@ mod tests {
 
         // White no short castle because passthrough check
         {
-            let board = fen::parse("rn2kbnr/ppp1ppp1/3p3p/8/2q1P1b1/NP3P1N/PBPP2PP/R3K2R w KQkq - 0 9")?;
+            let board =
+                fen::parse("rn2kbnr/ppp1ppp1/3p3p/8/2q1P1b1/NP3P1N/PBPP2PP/R3K2R w KQkq - 0 9")?;
 
             let all_legal_moves = get_all_legal_moves(&board, board.get_current_turn());
 
@@ -1974,18 +1964,19 @@ mod tests {
 
             let all_legal_moves = get_all_legal_moves(&board, board.get_current_turn());
 
-            // The king has no valid moves. 
+            // The king has no valid moves.
             // Note that long castling is not a legal move, even though black still
             // has long castle rights and the start & end positions are not targets.
             // It is not legal because the king passes through check on d8.
             assert!(!all_legal_moves.contains_key(&Position::e8()));
 
-            assert!(board.get_castle_rights().black_long_castle_rights == true);
+            assert!(board.get_castle_rights().black_long_castle_rights);
         }
 
         // Black no short castle because passthrough check
         {
-            let board = fen::parse("rnb1k2r/ppqp1ppp/2p4n/4p3/1Q6/b1PP2PP/PP2PP2/RNB1KBNR b KQkq - 0 6")?;
+            let board =
+                fen::parse("rnb1k2r/ppqp1ppp/2p4n/4p3/1Q6/b1PP2PP/PP2PP2/RNB1KBNR b KQkq - 0 6")?;
 
             let all_legal_moves = get_all_legal_moves(&board, board.get_current_turn());
 

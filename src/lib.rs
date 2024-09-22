@@ -16,6 +16,12 @@ impl ParseError {
     }
 }
 
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0,)
+    }
+}
+
 pub mod game_options {
     pub const MOVE_OPTION: &str = "1";
     pub const PREVIOUS_OPTION: &str = "2";
@@ -52,7 +58,7 @@ pub fn run() {
             println!("+{relative_score}");
         }
 
-        println!("");
+        println!();
 
         let move_state = game.get_move_state();
 
@@ -95,13 +101,13 @@ pub fn run() {
                             }
                         }
 
-                        println!("");
+                        println!();
                     }
                     game_options::PREVIOUS_OPTION => {
-                        game.previous();
+                        game.previous_move();
                     }
                     game_options::NEXT_OPTION => {
-                        game.next();
+                        game.next_move();
                     }
                     game_options::DRAW_OPTION => {
                         println!("Your opponent has offered a draw, do you accept (Y/n):");
@@ -177,10 +183,10 @@ pub fn run() {
                     game = Game::new(Board::default());
                 }
                 post_game_options::PREVIOUS_OPTION => {
-                    game.previous();
+                    game.previous_move();
                 }
                 post_game_options::NEXT_OPTION => {
-                    game.next();
+                    game.next_move();
                 }
                 post_game_options::QUIT_OPTION => keep_going = false,
                 _ => (),

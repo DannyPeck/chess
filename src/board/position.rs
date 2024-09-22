@@ -93,7 +93,7 @@ impl Position {
         ))
     }
 
-    pub fn from_str(position: &str) -> Option<Position> {
+    pub fn from_notation(position: &str) -> Option<Position> {
         if position.len() != 2 {
             return None;
         }
@@ -447,37 +447,37 @@ mod tests {
     }
 
     #[test]
-    fn from_str() {
+    fn from_notation() {
         // Valid positions
-        assert_eq!(Position::from_str("a1").unwrap(), Position::a1());
-        assert_eq!(Position::from_str("b2").unwrap(), Position::b2());
-        assert_eq!(Position::from_str("c3").unwrap(), Position::c3());
-        assert_eq!(Position::from_str("d4").unwrap(), Position::d4());
-        assert_eq!(Position::from_str("e5").unwrap(), Position::e5());
-        assert_eq!(Position::from_str("f6").unwrap(), Position::f6());
-        assert_eq!(Position::from_str("g7").unwrap(), Position::g7());
-        assert_eq!(Position::from_str("h8").unwrap(), Position::h8());
+        assert_eq!(Position::from_notation("a1").unwrap(), Position::a1());
+        assert_eq!(Position::from_notation("b2").unwrap(), Position::b2());
+        assert_eq!(Position::from_notation("c3").unwrap(), Position::c3());
+        assert_eq!(Position::from_notation("d4").unwrap(), Position::d4());
+        assert_eq!(Position::from_notation("e5").unwrap(), Position::e5());
+        assert_eq!(Position::from_notation("f6").unwrap(), Position::f6());
+        assert_eq!(Position::from_notation("g7").unwrap(), Position::g7());
+        assert_eq!(Position::from_notation("h8").unwrap(), Position::h8());
 
         // Valid case insensitive
-        assert_eq!(Position::from_str("A8").unwrap(), Position::a8());
-        assert_eq!(Position::from_str("B7").unwrap(), Position::b7());
-        assert_eq!(Position::from_str("C6").unwrap(), Position::c6());
-        assert_eq!(Position::from_str("D5").unwrap(), Position::d5());
-        assert_eq!(Position::from_str("E4").unwrap(), Position::e4());
-        assert_eq!(Position::from_str("F3").unwrap(), Position::f3());
-        assert_eq!(Position::from_str("G2").unwrap(), Position::g2());
-        assert_eq!(Position::from_str("H1").unwrap(), Position::h1());
+        assert_eq!(Position::from_notation("A8").unwrap(), Position::a8());
+        assert_eq!(Position::from_notation("B7").unwrap(), Position::b7());
+        assert_eq!(Position::from_notation("C6").unwrap(), Position::c6());
+        assert_eq!(Position::from_notation("D5").unwrap(), Position::d5());
+        assert_eq!(Position::from_notation("E4").unwrap(), Position::e4());
+        assert_eq!(Position::from_notation("F3").unwrap(), Position::f3());
+        assert_eq!(Position::from_notation("G2").unwrap(), Position::g2());
+        assert_eq!(Position::from_notation("H1").unwrap(), Position::h1());
 
         // Invalid positions
-        assert_eq!(Position::from_str("a10"), None);
-        assert_eq!(Position::from_str("b9"), None);
-        assert_eq!(Position::from_str("b"), None);
-        assert_eq!(Position::from_str("3"), None);
-        assert_eq!(Position::from_str("i"), None);
-        assert_eq!(Position::from_str("z"), None);
-        assert_eq!(Position::from_str("3b"), None);
-        assert_eq!(Position::from_str("h0"), None);
-        assert_eq!(Position::from_str(""), None);
+        assert_eq!(Position::from_notation("a10"), None);
+        assert_eq!(Position::from_notation("b9"), None);
+        assert_eq!(Position::from_notation("b"), None);
+        assert_eq!(Position::from_notation("3"), None);
+        assert_eq!(Position::from_notation("i"), None);
+        assert_eq!(Position::from_notation("z"), None);
+        assert_eq!(Position::from_notation("3b"), None);
+        assert_eq!(Position::from_notation("h0"), None);
+        assert_eq!(Position::from_notation(""), None);
     }
 
     #[test]

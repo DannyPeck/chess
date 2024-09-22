@@ -148,7 +148,7 @@ pub fn parse_en_passant_target(en_passant_target: &str) -> Result<Option<Positio
         return Ok(None);
     }
 
-    match Position::from_str(en_passant_target) {
+    match Position::from_notation(en_passant_target) {
         Some(position) => Ok(Some(position)),
         None => Err(ParseError::new("Invalid en passant target position.")),
     }

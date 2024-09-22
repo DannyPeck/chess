@@ -140,7 +140,7 @@ impl Board {
     }
 
     pub fn get_repetition_state(&self) -> RepetitionState {
-        let en_passant_capture = if utils::possible_en_passant_capture(&self) {
+        let en_passant_capture = if utils::possible_en_passant_capture(self) {
             self.en_passant_target.clone()
         } else {
             None
@@ -202,7 +202,7 @@ impl Board {
     }
 
     pub fn add_piece(&mut self, position: &Position, piece: Piece) {
-        self.set_position(&position, Some(piece));
+        self.set_position(position, Some(piece));
     }
 
     pub fn add_pieces(&mut self, pieces: Vec<(Position, Piece)>) {
@@ -276,7 +276,7 @@ impl std::fmt::Display for Board {
             board_string.push_str(&rank_string);
 
             if rank != rank::ONE {
-                board_string.push_str("\n");
+                board_string.push('\n');
             }
         }
 
