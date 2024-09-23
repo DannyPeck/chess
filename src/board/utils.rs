@@ -724,10 +724,6 @@ pub fn get_all_legal_moves(
     let mut all_legal_moves = HashMap::new();
     let all_moves = get_all_moves(board, side);
     for (start, mut piece_moves) in all_moves {
-        if start.value() == 49 {
-            println!("Before: {piece_moves:#?}");
-        }
-
         piece_moves.retain(|end, move_kind| {
             let move_request = match move_kind {
                 // Just pick a promotion type, it's just to ensure that the move_piece() call succeeds.
@@ -740,11 +736,7 @@ pub fn get_all_legal_moves(
             let mut new_board = board.clone();
             move_piece(&mut new_board, move_request).is_ok() && !is_in_check(&new_board, side)
         });
-
-        if start.value() == 49 {
-            println!("After: {piece_moves:#?}");
-        }
-
+        
         if !piece_moves.is_empty() {
             all_legal_moves.insert(start, piece_moves);
         }
