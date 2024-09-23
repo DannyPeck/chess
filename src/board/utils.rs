@@ -6,7 +6,7 @@ use crate::{
     ParseError,
 };
 
-use super::{rank, Board};
+use super::{file, rank, Board};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum MoveState {
@@ -78,7 +78,7 @@ impl MoveRequest {
         let promotion = coordinate_notation.chars().nth(4);
 
         match promotion {
-            Some(notation) => match PromotionType::from(notation) {
+            Some(notation) => match PromotionType::from_coordinate(notation) {
                 Some(promotion_type) => Ok(MoveRequest::promotion(start, end, promotion_type)),
                 None => Err(ParseError::new("Invalid promotion notation.")),
             },
@@ -87,7 +87,93 @@ impl MoveRequest {
     }
 }
 
-pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<(), MoveError> {
+#[derive(Debug)]
+pub struct MoveInfo {
+    pub start: Position,
+    pub end: Position,
+    pub piece_type: PieceType,
+    pub is_capture: bool,
+    pub file_disambiguation: bool,
+    pub rank_disambiguation: bool,
+    pub move_kind: MoveKind,
+    pub move_state: Option<MoveState>,
+    pub promotion: Option<PromotionType>,
+}
+
+impl MoveInfo {
+    pub fn to_notation(&self) -> String {
+        let mut notation = String::new();
+
+        match self.move_kind {
+            MoveKind::ShortCastle => {
+                notation.push_str("O-O");
+            }
+            MoveKind::LongCastle => {
+                notation.push_str("O-O-O");
+            }
+            _ => {
+                match self.piece_type {
+                    PieceType::Pawn => {
+                        if self.is_capture {
+                            notation.push(file::to_char(self.start.file()));
+                        }
+                    }
+                    PieceType::Knight => {
+                        notation.push('N');
+                    }
+                    PieceType::Bishop => {
+                        notation.push('B');
+                    }
+                    PieceType::Rook => {
+                        notation.push('R');
+                    }
+                    PieceType::Queen => {
+                        notation.push('Q');
+                    }
+                    PieceType::King => {
+                        notation.push('K');
+                    }
+                }
+
+                if self.file_disambiguation {
+                    notation.push(file::to_char(self.start.file()));
+                }
+
+                if self.rank_disambiguation {
+                    notation.push(rank::to_char(self.start.rank()));
+                }
+
+                if self.is_capture {
+                    notation.push('x');
+                }
+
+                let end = format!("{}", self.end);
+                notation.push_str(end.as_str());
+
+                if let Some(promotion) = &self.promotion {
+                    let promition_notation = format!("={}", promotion.to_algebraic());
+                    notation.push_str(promition_notation.as_str());
+                }
+            }
+        }
+
+        if let Some(move_state) = &self.move_state {
+            match move_state {
+                MoveState::Check => {
+                    notation.push('+');
+                }
+                MoveState::Checkmate => {
+                    notation.push('#');
+                }
+                _ => (),
+            }
+        }
+
+        notation
+    }
+}
+
+pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<MoveInfo, MoveError> {
     let move_kind = get_move(board, &request)?;
 
     let side = board.get_current_turn();
@@ -199,10 +285,11 @@ pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<(), MoveErr
         board.half_moves += 1;
     }
 
+    let initial_piece_type = moving_piece.piece_type.clone();
     let piece = match move_kind {
         MoveKind::Promotion(_) => {
             // We would not get the MoveKind promotion if it was an invalid request.
-            let promotion_piece_type = request.promotion.unwrap().to_piece_type();
+            let promotion_piece_type = request.promotion.as_ref().unwrap().to_piece_type();
             Piece::new(promotion_piece_type, board.get_current_turn().clone())
         }
         _ => moving_piece,
@@ -213,7 +300,19 @@ pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<(), MoveErr
 
     board.change_turn();
 
-    Ok(())
+    let move_info = MoveInfo {
+        start: request.start,
+        end: request.end,
+        piece_type: initial_piece_type,
+        is_capture,
+        file_disambiguation: false,
+        rank_disambiguation: false,
+        move_kind,
+        move_state: None,
+        promotion: request.promotion,
+    };
+
+    Ok(move_info)
 }
 
 pub fn get_move(board: &Board, request: &MoveRequest) -> Result<MoveKind, MoveError> {
@@ -625,12 +724,27 @@ pub fn get_all_legal_moves(
     let mut all_legal_moves = HashMap::new();
     let all_moves = get_all_moves(board, side);
     for (start, mut piece_moves) in all_moves {
-        piece_moves.retain(|end, _| {
-            let move_request = MoveRequest::new(start.clone(), end.clone());
+        if start.value() == 49 {
+            println!("Before: {piece_moves:#?}");
+        }
+
+        piece_moves.retain(|end, move_kind| {
+            let move_request = match move_kind {
+                // Just pick a promotion type, it's just to ensure that the move_piece() call succeeds.
+                MoveKind::Promotion(_) => {
+                    MoveRequest::promotion(start.clone(), end.clone(), PromotionType::Queen)
+                }
+                _ => MoveRequest::new(start.clone(), end.clone()),
+            };
 
             let mut new_board = board.clone();
             move_piece(&mut new_board, move_request).is_ok() && !is_in_check(&new_board, side)
         });
+
+        if start.value() == 49 {
+            println!("After: {piece_moves:#?}");
+        }
+
         if !piece_moves.is_empty() {
             all_legal_moves.insert(start, piece_moves);
         }
@@ -672,27 +786,31 @@ pub fn is_en_passant_target(board: &Board, position: &Position) -> bool {
 pub fn possible_en_passant_capture(board: &Board) -> bool {
     match board.get_en_passant_target() {
         Some(target) => {
-            let left_diagonal = match board.get_current_turn() {
-                Side::White => Position::from_file_and_rank(target.file() - 1, target.rank() - 1),
-                Side::Black => Position::from_file_and_rank(target.file() - 1, target.rank() + 1),
+            let side = board.get_current_turn();
+            let left_diagonal = match side {
+                Side::White => Position::from_offset(target, &Offset::new(-1, -1)),
+                Side::Black => Position::from_offset(target, &Offset::new(-1, 1)),
             };
 
-            let right_diagonal = match board.get_current_turn() {
-                Side::White => Position::from_file_and_rank(target.file() + 1, target.rank() - 1),
-                Side::Black => Position::from_file_and_rank(target.file() - 1, target.rank() - 1),
+            let right_diagonal = match side {
+                Side::White => Position::from_offset(target, &Offset::new(1, -1)),
+                Side::Black => Position::from_offset(target, &Offset::new(-1, -1)),
             };
 
             let mut valid_capture = false;
-            if let Ok(moves) = get_piece_moves(board, board.get_current_turn(), &left_diagonal) {
-                valid_capture = moves.contains_key(target);
+            if let Some(left_diagonal) = left_diagonal {
+                if let Ok(moves) = get_piece_moves(board, side, &left_diagonal) {
+                    valid_capture = moves.contains_key(target);
+                };
             };
 
             // Only check the next position if we didn't already find a valid capture.
             if !valid_capture {
-                if let Ok(moves) = get_piece_moves(board, board.get_current_turn(), &right_diagonal)
-                {
-                    valid_capture = moves.contains_key(target);
-                };
+                if let Some(right_diagonal) = right_diagonal {
+                    if let Ok(moves) = get_piece_moves(board, side, &right_diagonal) {
+                        valid_capture = moves.contains_key(target);
+                    };
+                }
             }
 
             valid_capture

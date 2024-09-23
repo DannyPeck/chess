@@ -4,8 +4,8 @@ pub mod rank;
 mod utils;
 
 pub use utils::{
-    get_all_legal_moves, get_move_state, is_in_check, move_piece, MoveError, MoveKind, MoveRequest,
-    MoveState,
+    get_all_legal_moves, get_move_state, is_in_check, move_piece, MoveError, MoveInfo, MoveKind,
+    MoveRequest, MoveState,
 };
 
 use std::collections::HashSet;

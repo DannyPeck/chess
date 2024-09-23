@@ -46,13 +46,22 @@ impl PromotionType {
         }
     }
 
-    pub fn from(notation: char) -> Option<PromotionType> {
+    pub fn from_coordinate(notation: char) -> Option<PromotionType> {
         match notation {
             'q' => Some(PromotionType::Queen),
             'n' => Some(PromotionType::Knight),
             'b' => Some(PromotionType::Bishop),
             'r' => Some(PromotionType::Rook),
             _ => None,
+        }
+    }
+
+    pub fn to_algebraic(&self) -> char {
+        match self {
+            PromotionType::Knight => 'N',
+            PromotionType::Bishop => 'B',
+            PromotionType::Rook => 'R',
+            PromotionType::Queen => 'Q',
         }
     }
 }

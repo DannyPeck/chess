@@ -96,8 +96,11 @@ pub fn run() {
                         let coordinates = coordinates.trim();
 
                         if let Ok(request) = MoveRequest::from_coordinate(coordinates) {
-                            if let Err(error) = game.attempt_move(request) {
-                                println!("Move Error: {}", error);
+                            match game.attempt_move(request) {
+                                Ok(move_info) => {
+                                    println!("{}", move_info.to_notation());
+                                }
+                                Err(error) => println!("Move Error: {}", error),
                             }
                         }
 
