@@ -39,7 +39,8 @@ pub mod post_game_options {
 }
 
 pub fn run() {
-    let mut game = Game::new(Board::default());
+    let board = Board::default();
+    let mut game = Game::new(board);
 
     let mut keep_going = true;
     while keep_going {
@@ -98,7 +99,7 @@ pub fn run() {
                         if let Ok(request) = MoveRequest::from_coordinate(coordinates) {
                             match game.attempt_move(request) {
                                 Ok(move_info) => {
-                                    println!("{}", move_info.to_notation());
+                                    println!("\nMove: {}", move_info.to_notation());
                                 }
                                 Err(error) => println!("Move Error: {}", error),
                             }

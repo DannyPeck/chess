@@ -186,15 +186,19 @@ pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<MoveInfo, M
         let pass_through_check = match (side, &move_kind) {
             (Side::White, MoveKind::ShortCastle) => {
                 opponent_target_positions.contains(&Position::f1())
+                    || opponent_target_positions.contains(&Position::e1())
             }
             (Side::White, MoveKind::LongCastle) => {
                 opponent_target_positions.contains(&Position::d1())
+                    || opponent_target_positions.contains(&Position::e1())
             }
             (Side::Black, MoveKind::ShortCastle) => {
                 opponent_target_positions.contains(&Position::f8())
+                    || opponent_target_positions.contains(&Position::e8())
             }
             (Side::Black, MoveKind::LongCastle) => {
                 opponent_target_positions.contains(&Position::d8())
+                    || opponent_target_positions.contains(&Position::e8())
             }
             _ => false,
         };
@@ -736,7 +740,7 @@ pub fn get_all_legal_moves(
             let mut new_board = board.clone();
             move_piece(&mut new_board, move_request).is_ok() && !is_in_check(&new_board, side)
         });
-        
+
         if !piece_moves.is_empty() {
             all_legal_moves.insert(start, piece_moves);
         }
