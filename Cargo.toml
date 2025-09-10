@@ -3,7 +3,5 @@ name = "chess"
 version = "0.1.0"
 edition = "2021"
 
-[profile.dev]
-profiler = true
-
 [dependencies]
+anyhow = "1.0"

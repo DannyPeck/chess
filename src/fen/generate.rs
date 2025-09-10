@@ -98,10 +98,10 @@ pub fn generate_full_moves(full_moves: u32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fen, ParseError};
+    use crate::fen;
 
     #[test]
-    fn generate_test() -> Result<(), ParseError> {
+    fn generate_test() -> anyhow::Result<()> {
         assert_eq!(
             generate(&Board::default()),
             "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -116,7 +116,7 @@ mod tests {
     }
 
     #[test]
-    fn generate_piece_placement_test() -> Result<(), ParseError> {
+    fn generate_piece_placement_test() -> anyhow::Result<()> {
         assert_eq!(
             generate_piece_placement(&Board::default()),
             "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"

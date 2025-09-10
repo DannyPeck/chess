@@ -1,30 +1,27 @@
 use crate::{
     board::{file, position::Position, rank, Board, CastleRights},
     piece::{Piece, Side},
-    ParseError,
 };
 
-pub fn parse(fen: &str) -> Result<Board, ParseError> {
+use anyhow::{anyhow, bail};
+
+pub fn parse(fen: &str) -> anyhow::Result<Board> {
     let mut fen_iter = fen.split(' ');
 
     let piece_placement = fen_iter
         .next()
-        .ok_or(ParseError::new("Missing piece placement data."))?;
+        .ok_or(anyhow!("Missing piece placement data."))?;
     let active_color = fen_iter
         .next()
-        .ok_or(ParseError::new("Missing active color data."))?;
+        .ok_or(anyhow!("Missing active color data."))?;
     let castling_availability = fen_iter
         .next()
-        .ok_or(ParseError::new("Missing castling availability data."))?;
+        .ok_or(anyhow!("Missing castling availability data."))?;
     let en_passant_target_square = fen_iter
         .next()
-        .ok_or(ParseError::new("Missing en passant target data."))?;
-    let half_moves = fen_iter
-        .next()
-        .ok_or(ParseError::new("Missing half move data."))?;
-    let full_moves = fen_iter
-        .next()
-        .ok_or(ParseError::new("Missing full move data."))?;
+        .ok_or(anyhow!("Missing en passant target data."))?;
+    let half_moves = fen_iter.next().ok_or(anyhow!("Missing half move data."))?;
+    let full_moves = fen_iter.next().ok_or(anyhow!("Missing full move data."))?;
 
     let pieces = parse_piece_placement(piece_placement)?;
     let current_turn = parse_active_color(active_color)?;
@@ -45,7 +42,7 @@ pub fn parse(fen: &str) -> Result<Board, ParseError> {
     Ok(board)
 }
 
-pub fn parse_piece_placement(piece_notation: &str) -> Result<Vec<(Position, Piece)>, ParseError> {
+pub fn parse_piece_placement(piece_notation: &str) -> anyhow::Result<Vec<(Position, Piece)>> {
     let mut pieces = Vec::new();
 
     let mut current_rank = rank::LENGTH;
@@ -63,8 +60,7 @@ pub fn parse_piece_placement(piece_notation: &str) -> Result<Vec<(Position, Piec
                     pieces.push((position, piece));
                     current_file += 1;
                 } else {
-                    let error = format!("Invalid piece notation found on {}", position);
-                    return Err(ParseError::new(error.as_str()));
+                    bail!("Invalid piece notation found on {position}");
                 }
             }
 
@@ -74,7 +70,7 @@ pub fn parse_piece_placement(piece_notation: &str) -> Result<Vec<(Position, Piec
                     "Rank {}'s notation exceeded the board length.",
                     rank::to_char(current_rank)
                 );
-                return Err(ParseError::new(error.as_str()));
+                bail!(error);
             }
         }
 
@@ -84,7 +80,7 @@ pub fn parse_piece_placement(piece_notation: &str) -> Result<Vec<(Position, Piec
                 rank::to_char(current_rank),
                 file::to_char(current_file)
             );
-            return Err(ParseError::new(error.as_str()));
+            bail!(error);
         }
 
         if current_rank == 0 {
@@ -98,20 +94,17 @@ pub fn parse_piece_placement(piece_notation: &str) -> Result<Vec<(Position, Piec
             "Insufficient number of ranks found. Stopped on rank {}.",
             rank::to_char(current_rank)
         );
-        return Err(ParseError::new(error.as_str()));
+        bail!(error);
     }
 
     Ok(pieces)
 }
 
-pub fn parse_active_color(active_color: &str) -> Result<Side, ParseError> {
-    Side::from(active_color).ok_or({
-        let error = format!("Invalid active color {active_color}");
-        ParseError::new(error.as_str())
-    })
+pub fn parse_active_color(active_color: &str) -> anyhow::Result<Side> {
+    Side::from(active_color).ok_or(anyhow!("Invalid active color {active_color}"))
 }
 
-pub fn parse_castling_availability(castling_availibity: &str) -> Result<CastleRights, ParseError> {
+pub fn parse_castling_availability(castling_availibity: &str) -> anyhow::Result<CastleRights> {
     let mut white_short_castle_rights = false;
     let mut white_long_castle_rights = false;
     let mut black_short_castle_rights = false;
@@ -143,27 +136,27 @@ pub fn parse_castling_availability(castling_availibity: &str) -> Result<CastleRi
     Ok(castling_rights)
 }
 
-pub fn parse_en_passant_target(en_passant_target: &str) -> Result<Option<Position>, ParseError> {
+pub fn parse_en_passant_target(en_passant_target: &str) -> anyhow::Result<Option<Position>> {
     if en_passant_target == "-" {
         return Ok(None);
     }
 
     match Position::from_notation(en_passant_target) {
         Some(position) => Ok(Some(position)),
-        None => Err(ParseError::new("Invalid en passant target position.")),
+        None => Err(anyhow!("Invalid en passant target position.")),
     }
 }
 
-pub fn parse_half_moves(half_moves: &str) -> Result<u32, ParseError> {
+pub fn parse_half_moves(half_moves: &str) -> anyhow::Result<u32> {
     half_moves
         .parse()
-        .map_err(|_| ParseError::new("Invalid half moves value."))
+        .map_err(|_| anyhow!("Invalid half moves value."))
 }
 
-pub fn parse_full_moves(full_moves: &str) -> Result<u32, ParseError> {
+pub fn parse_full_moves(full_moves: &str) -> anyhow::Result<u32> {
     full_moves
         .parse()
-        .map_err(|_| ParseError::new("Invalid full moves value."))
+        .map_err(|_| anyhow!("Invalid full moves value."))
 }
 
 #[cfg(test)]
@@ -173,7 +166,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_valid() -> Result<(), ParseError> {
+    fn parse_valid() -> anyhow::Result<()> {
         let board = parse("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3 0 6")?;
 
         let position_tests: Vec<(Position, Option<Piece>)> = vec![
@@ -264,7 +257,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_invalid() -> Result<(), ParseError> {
+    fn parse_invalid() -> anyhow::Result<()> {
         // Missing full moves
         assert!(
             parse("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R b Kq d3 0").is_err()
@@ -289,7 +282,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_piece_notation_valid() -> Result<(), ParseError> {
+    fn parse_piece_notation_valid() -> anyhow::Result<()> {
         let pieces =
             parse_piece_placement("rnbqkbn1/1p1p1pp1/7r/pBp1p2p/P2PP3/R4N2/1PP2PPP/1NBQK2R")?;
 
@@ -395,7 +388,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_active_color_test() -> Result<(), ParseError> {
+    fn parse_active_color_test() -> anyhow::Result<()> {
         let white = parse_active_color("w")?;
         assert_eq!(white, Side::White);
 
@@ -408,7 +401,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_castling_availability_test() -> Result<(), ParseError> {
+    fn parse_castling_availability_test() -> anyhow::Result<()> {
         // All combinations
         assert_eq!(
             parse_castling_availability("KQkq")?,
@@ -487,7 +480,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_en_passant_target_test() -> Result<(), ParseError> {
+    fn parse_en_passant_target_test() -> anyhow::Result<()> {
         assert_eq!(parse_en_passant_target("d3")?, Some(Position::d3()));
         assert_eq!(parse_en_passant_target("-")?, None);
 
@@ -497,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_half_moves_test() -> Result<(), ParseError> {
+    fn parse_half_moves_test() -> anyhow::Result<()> {
         assert_eq!(parse_half_moves("0")?, 0);
         assert_eq!(parse_half_moves("1")?, 1);
         assert_eq!(parse_half_moves("13")?, 13);
@@ -508,7 +501,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_full_moves_test() -> Result<(), ParseError> {
+    fn parse_full_moves_test() -> anyhow::Result<()> {
         assert_eq!(parse_full_moves("0")?, 0);
         assert_eq!(parse_full_moves("1")?, 1);
         assert_eq!(parse_full_moves("13")?, 13);

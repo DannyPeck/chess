@@ -3,10 +3,11 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     board::position::{Offset, Position},
     piece::{Piece, PieceType, PromotionType, Side},
-    ParseError,
 };
 
 use super::{file, rank, Board};
+
+use anyhow::{anyhow, bail};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum MoveState {
@@ -14,21 +15,6 @@ pub enum MoveState {
     Stalemate,
     Check,
     Checkmate,
-}
-
-#[derive(Debug)]
-pub struct MoveError(String);
-
-impl MoveError {
-    pub fn new(error: &str) -> MoveError {
-        MoveError(String::from(error))
-    }
-}
-
-impl std::fmt::Display for MoveError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
 }
 
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]
@@ -66,21 +52,21 @@ impl MoveRequest {
         }
     }
 
-    pub fn from_coordinate(coordinate_notation: &str) -> Result<MoveRequest, ParseError> {
+    pub fn from_coordinate(coordinate_notation: &str) -> anyhow::Result<MoveRequest> {
         if coordinate_notation.len() < 4 {
-            return Err(ParseError::new("Notation is incomplete."));
+            bail!("Notation is incomplete.");
         }
 
         let start = Position::from_notation(&coordinate_notation[0..2])
-            .ok_or(ParseError::new("Invalid start position."))?;
+            .ok_or(anyhow!("Invalid start position."))?;
         let end = Position::from_notation(&coordinate_notation[2..4])
-            .ok_or(ParseError::new("Invalid end position."))?;
+            .ok_or(anyhow!("Invalid end position."))?;
         let promotion = coordinate_notation.chars().nth(4);
 
         match promotion {
             Some(notation) => match PromotionType::from_coordinate(notation) {
                 Some(promotion_type) => Ok(MoveRequest::promotion(start, end, promotion_type)),
-                None => Err(ParseError::new("Invalid promotion notation.")),
+                None => Err(anyhow!("Invalid promotion notation.")),
             },
             None => Ok(MoveRequest::new(start, end)),
         }
@@ -173,7 +159,7 @@ impl MoveInfo {
     }
 }
 
-pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<MoveInfo, MoveError> {
+pub fn move_piece(board: &mut Board, request: MoveRequest) -> anyhow::Result<MoveInfo> {
     let move_kind = get_move(board, &request)?;
 
     let side = board.get_current_turn();
@@ -204,7 +190,7 @@ pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<MoveInfo, M
         };
 
         if pass_through_check {
-            return Err(MoveError::new("Invalid move, cannot move through check."));
+            bail!("Invalid move, cannot move through check.");
         }
     }
 
@@ -319,16 +305,14 @@ pub fn move_piece(board: &mut Board, request: MoveRequest) -> Result<MoveInfo, M
     Ok(move_info)
 }
 
-pub fn get_move(board: &Board, request: &MoveRequest) -> Result<MoveKind, MoveError> {
+pub fn get_move(board: &Board, request: &MoveRequest) -> anyhow::Result<MoveKind> {
     let moves = get_piece_moves(board, board.get_current_turn(), &request.start)?;
     let move_kind = moves
         .get(&request.end)
-        .ok_or(MoveError::new("Provided move is not valid."))?;
+        .ok_or(anyhow!("Provided move is not valid."))?;
 
     if let (MoveKind::Promotion(_), None) = (move_kind, &request.promotion) {
-        return Err(MoveError::new(
-            "Invalid move request, missing promotion data.",
-        ));
+        bail!("Invalid move request, missing promotion data.");
     }
 
     Ok(move_kind.clone())
@@ -338,7 +322,7 @@ pub fn get_piece_moves(
     board: &Board,
     side: &Side,
     start: &Position,
-) -> Result<HashMap<Position, MoveKind>, MoveError> {
+) -> anyhow::Result<HashMap<Position, MoveKind>> {
     match board.get_piece(start) {
         Some(piece) => {
             if piece.side == *side {
@@ -353,12 +337,12 @@ pub fn get_piece_moves(
 
                 Ok(moves)
             } else {
-                Err(MoveError::new(
-                    "Unable to find a piece for the current player at the provided position.",
+                Err(anyhow!(
+                    "Unable to find a piece for the current player at the provided position."
                 ))
             }
         }
-        None => Err(MoveError::new("No piece found at the provided position.")),
+        None => Err(anyhow!("No piece found at the provided position.")),
     }
 }
 
@@ -872,7 +856,7 @@ mod tests {
     }
 
     #[test]
-    fn move_request_from_coordinate_test() -> Result<(), ParseError> {
+    fn move_request_from_coordinate_test() -> anyhow::Result<()> {
         // Normal move
         {
             let move_request = MoveRequest::from_coordinate("e3e4").unwrap();
@@ -933,7 +917,7 @@ mod tests {
     }
 
     #[test]
-    fn get_pawn_moves_white() -> Result<(), ParseError> {
+    fn get_pawn_moves_white() -> anyhow::Result<()> {
         // White starting line
         {
             let board = Board::default();
@@ -1035,7 +1019,7 @@ mod tests {
     }
 
     #[test]
-    fn get_pawn_moves_black() -> Result<(), ParseError> {
+    fn get_pawn_moves_black() -> anyhow::Result<()> {
         // Black starting line
         {
             let board = Board::default();
@@ -1135,7 +1119,7 @@ mod tests {
     }
 
     #[test]
-    fn get_knight_moves_test() -> Result<(), ParseError> {
+    fn get_knight_moves_test() -> anyhow::Result<()> {
         // All moves
         {
             let board =
@@ -1215,7 +1199,7 @@ mod tests {
     }
 
     #[test]
-    fn get_rook_moves_test() -> Result<(), ParseError> {
+    fn get_rook_moves_test() -> anyhow::Result<()> {
         // All directions empty to edge of board
         {
             let board = fen::parse("r1bqkbnr/3pppp1/P6p/2p5/1R6/2N5/2PPPPPP/2BQKBNR w Kkq - 0 9")?;
@@ -1270,7 +1254,7 @@ mod tests {
     }
 
     #[test]
-    fn get_bishop_moves_test() -> Result<(), ParseError> {
+    fn get_bishop_moves_test() -> anyhow::Result<()> {
         // All directions empty to edge of board
         {
             let board =
@@ -1324,7 +1308,7 @@ mod tests {
     }
 
     #[test]
-    fn get_queen_moves_test() -> Result<(), ParseError> {
+    fn get_queen_moves_test() -> anyhow::Result<()> {
         // All directions empty to edge of board
         {
             let board =
@@ -1405,7 +1389,7 @@ mod tests {
     }
 
     #[test]
-    fn get_king_moves_test() -> Result<(), ParseError> {
+    fn get_king_moves_test() -> anyhow::Result<()> {
         // All directions
         {
             let board = fen::parse("rnbqkbnr/2pppppp/4P3/1p6/3K4/p7/PPPP1PPP/RNBQ1BNR w kq - 0 7")?;
@@ -1701,7 +1685,7 @@ mod tests {
     }
 
     #[test]
-    fn get_all_moves_test() -> Result<(), ParseError> {
+    fn get_all_moves_test() -> anyhow::Result<()> {
         let board =
             fen::parse("r3k1n1/3b1pbr/ppn1p1p1/7p/3Q1P2/PPP3PN/R3P2P/1NB1KB1R w Kq - 1 15")?;
 
@@ -1907,7 +1891,7 @@ mod tests {
     }
 
     #[test]
-    fn is_in_check_test() -> Result<(), ParseError> {
+    fn is_in_check_test() -> anyhow::Result<()> {
         // White in check
         {
             let board =
@@ -1944,7 +1928,7 @@ mod tests {
     }
 
     #[test]
-    fn get_move_state_test() -> Result<(), ParseError> {
+    fn get_move_state_test() -> anyhow::Result<()> {
         // White in checkmate
         {
             let board =
@@ -2027,7 +2011,7 @@ mod tests {
     }
 
     #[test]
-    fn get_all_legal_moves_test() -> Result<(), ParseError> {
+    fn get_all_legal_moves_test() -> anyhow::Result<()> {
         {
             let board =
                 fen::parse("rnbqkbnr/pp1pp1pp/2p2p2/7Q/5P2/4P3/PPPP2PP/RNB1KBNR b KQkq - 1 3")?;

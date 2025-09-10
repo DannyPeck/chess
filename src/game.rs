@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
 use crate::{
-    board::{self, Board, MoveError, MoveInfo, MoveRequest, MoveState, RepetitionState},
+    board::{self, Board, MoveInfo, MoveRequest, MoveState, RepetitionState},
     fen,
 };
+
+use anyhow::bail;
 
 #[derive(Debug)]
 pub struct Game {
@@ -55,10 +57,10 @@ impl Game {
         &self.board
     }
 
-    pub fn attempt_move(&mut self, request: MoveRequest) -> Result<MoveInfo, MoveError> {
+    pub fn attempt_move(&mut self, request: MoveRequest) -> anyhow::Result<MoveInfo> {
         let move_state = self.get_move_state();
         if move_state == MoveState::Checkmate || move_state == MoveState::Stalemate {
-            return Err(MoveError::new("Game is over."));
+            bail!("Game is over.");
         }
 
         let all_legal_moves =
@@ -68,7 +70,7 @@ impl Game {
             .get(&request.start)
             .map_or(false, |piece_moves| piece_moves.get(&request.end).is_some());
         if !valid_move {
-            return Err(MoveError::new("Invalid move."));
+            bail!("Invalid move.");
         }
 
         // Calculate if we need to do any move disambiguation before we change the state of the board.
@@ -160,12 +162,12 @@ impl Game {
 mod test {
     use board::position::Position;
 
-    use crate::{piece::PromotionType, ParseError};
+    use crate::piece::PromotionType;
 
     use super::*;
 
     #[test]
-    fn test_normal_pawn_move_notation() -> Result<(), ParseError> {
+    fn test_normal_pawn_move_notation() -> anyhow::Result<()> {
         // Move forward
         {
             let board =
@@ -206,7 +208,7 @@ mod test {
     }
 
     #[test]
-    fn test_pawn_promotion() -> Result<(), ParseError> {
+    fn test_pawn_promotion() -> anyhow::Result<()> {
         // Promotion to Queen
         {
             let board =
@@ -289,7 +291,7 @@ mod test {
     }
 
     #[test]
-    fn test_knight_move_notation() -> Result<(), ParseError> {
+    fn test_knight_move_notation() -> anyhow::Result<()> {
         // Normal knight move
         {
             let board = Board::default();
@@ -341,7 +343,7 @@ mod test {
     }
 
     #[test]
-    fn test_rook_move_notation() -> Result<(), ParseError> {
+    fn test_rook_move_notation() -> anyhow::Result<()> {
         // Normal rook move
         {
             let board = fen::parse("rnbqkbnr/1ppppppp/8/p7/P7/8/1PPPPPPP/RNBQKBNR w KQkq a6 0 2")?;
@@ -357,7 +359,7 @@ mod test {
     }
 
     #[test]
-    fn test_bishop_move_notation() -> Result<(), ParseError> {
+    fn test_bishop_move_notation() -> anyhow::Result<()> {
         // Normal bishop move
         {
             let board =
@@ -374,7 +376,7 @@ mod test {
     }
 
     #[test]
-    fn test_queen_move_notation() -> Result<(), ParseError> {
+    fn test_queen_move_notation() -> anyhow::Result<()> {
         // Normal queen move
         {
             let board = fen::parse("rnbqkbnr/pppp1ppp/8/8/3p4/7P/PPP1PPP1/RNBQKBNR w KQkq - 0 3")?;
@@ -390,7 +392,7 @@ mod test {
     }
 
     #[test]
-    fn test_king_move_notation() -> Result<(), ParseError> {
+    fn test_king_move_notation() -> anyhow::Result<()> {
         // Normal king move
         {
             let board =
@@ -442,7 +444,7 @@ mod test {
     }
 
     #[test]
-    fn test_check_notation() -> Result<(), ParseError> {
+    fn test_check_notation() -> anyhow::Result<()> {
         // Check
         {
             let board =
@@ -471,7 +473,7 @@ mod test {
     }
 
     #[test]
-    fn test_disambiguation() -> Result<(), ParseError> {
+    fn test_disambiguation() -> anyhow::Result<()> {
         // File disambiguation
         {
             let board = fen::parse("3r3r/8/8/R7/4Q2Q/8/8/R6Q b - - 0 1")?;

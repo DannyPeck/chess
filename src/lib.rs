@@ -7,21 +7,6 @@ use board::{Board, MoveRequest, MoveState};
 use game::Game;
 use piece::Side;
 
-#[derive(Debug)]
-pub struct ParseError(String);
-
-impl ParseError {
-    pub fn new(error: &str) -> ParseError {
-        ParseError(String::from(error))
-    }
-}
-
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0,)
-    }
-}
-
 pub mod game_options {
     pub const MOVE_OPTION: &str = "1";
     pub const PREVIOUS_OPTION: &str = "2";
