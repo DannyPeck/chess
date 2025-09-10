@@ -159,7 +159,7 @@ impl Game {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use board::position::Position;
 
     use crate::piece::PromotionType;

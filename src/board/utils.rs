@@ -1,11 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    board::position::{Offset, Position},
+    board::{
+        file,
+        position::{Offset, Position},
+        rank, Board,
+    },
     piece::{Piece, PieceType, PromotionType, Side},
 };
-
-use super::{file, rank, Board};
 
 use anyhow::{anyhow, bail};
 

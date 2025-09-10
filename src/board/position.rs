@@ -1,5 +1,4 @@
-use super::file;
-use super::rank;
+use crate::board::{file, rank};
 
 pub const A1: usize = 0;
 pub const B1: usize = 1;
